@@ -1,0 +1,66 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-hook\" session_start codex",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-otel\" ensure",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-hook\" prompt_submit codex",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-otel\" ensure",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-hook\" post_tool codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${PLUGIN_ROOT}/bin/tellem-hook\" stop codex",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}

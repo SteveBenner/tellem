@@ -1,0 +1,58 @@
+#!/usr/bin/env -S ruby --disable-gems
+# frozen_string_literal: true
+
+FAILURE_FILE = "hook-load-failure.json"
+FAILURE_BYTES = 4096
+
+def tellem_hook_state_dir
+  state = ENV["TELLEM_STATE_HOME"].to_s
+  return File.expand_path(state) unless state.empty?
+
+  xdg = ENV["XDG_STATE_HOME"].to_s
+  xdg = File.join(Dir.home, ".local", "state") if xdg.empty?
+  File.join(File.expand_path(File.join(xdg, "rplugin")), "tellem")
+end
+
+def tellem_hook_failure(error_class, message)
+  require "json"
+  require "fileutils"
+  require "rbconfig"
+  dir = tellem_hook_state_dir
+  text = message.to_s.dup.force_encoding(Encoding::UTF_8).scrub
+  text = text.byteslice(0, 1500).scrub
+  body = nil
+  loop do
+    body = JSON.generate("error_class" => error_class.to_s[0, 200], "message" => text, "ruby" => RUBY_VERSION,
+                         "ruby_path" => RbConfig.ruby, "at" => Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    break if body.bytesize <= FAILURE_BYTES || text.empty?
+
+    text = text.byteslice(0, text.bytesize / 2).scrub
+  end
+  FileUtils.mkdir_p(dir)
+  tmp = File.join(dir, "#{FAILURE_FILE}.#{Process.pid}")
+  File.write(tmp, body)
+  File.rename(tmp, File.join(dir, FAILURE_FILE))
+rescue SystemCallError, IOError, LoadError => e
+  $stderr.puts("tellem-hook: #{error_class}: #{message}; failure file not written: #{e.class}: #{e.message}")
+end
+
+def tellem_hook_clear
+  File.delete(File.join(tellem_hook_state_dir, FAILURE_FILE))
+rescue Errno::ENOENT
+  nil
+end
+
+begin
+  $stdout.reopen(File::NULL, "w")
+  if (RUBY_VERSION.split(".")[0, 2].map(&:to_i) <=> [3, 3]) < 0
+    tellem_hook_failure("Tellem::RubyBelowFloor", "Ruby #{RUBY_VERSION} is below the floor 3.3")
+  else
+    plugin_root = File.expand_path("..", File.dirname(File.realpath(__FILE__)))
+    require File.join(plugin_root, "lib", "tellem", "hook", "main")
+    Tellem::Hook::Main.run(ARGV, $stdin, plugin_root)
+    tellem_hook_clear
+  end
+rescue StandardError, ScriptError, SystemExit, NoMemoryError, SystemStackError, SecurityError => e
+  tellem_hook_failure(e.class.name, e.message) unless e.is_a?(SystemExit) && e.success?
+end
+exit 0

@@ -1,0 +1,268 @@
+schema: rplugin/v1
+id: tellem
+name: tellem
+version: 0.5.5
+rplugin: ">= 1.19.0"
+description: Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files.
+ports:
+  required: [state]
+  optional: [secrets, events, harness, identity, transcript_policy]
+  declared:
+    - name: harness
+      summary: Harness and host path conventions, transcript discovery, harness versions, and spawn tool names.
+      standalone: { file: lib/tellem/ports/harness.rb, class: Tellem::Ports::Harness }
+    - name: identity
+      summary: Persona evidence for a session and time; the standalone form answers unknown.
+      standalone: { file: lib/tellem/ports/identity.rb, class: Tellem::Ports::Identity }
+    - name: transcript_policy
+      summary: Tool names and path prefixes whose content is withheld before it enters the record, and the native readers a plugin declares; the standalone form returns empty lists.
+      standalone: { file: lib/tellem/ports/transcript_policy.rb, class: Tellem::Ports::TranscriptPolicy }
+extensions:
+  enabled: [rstack, claude-code, codex, os]
+  only: [claude-code, codex]
+corpora: null
+compatibility:
+  ruby: ">= 3.3, < 4.1"
+native: true
+contents:
+  skills:
+    - { id: tellem, path: skills/tellem/SKILL.md }
+  agents: []
+  specs:
+    - { path: specs/tellem.app.yml }
+    - { path: specs/tellem.impl.yml }
+  scripts: []
+  hooks: hooks/hooks.yml
+  docs:
+    - { path: docs/reference/formats.md }
+repository:
+  remote: ""
+  store_path: tellem
+settings:
+  - key: features.capture
+    type: bool
+    default: true
+    description: Lets the hook append raw metadata observations; mirrored to the capture.enabled flag file in tellem's state.
+  - key: features.derive
+    type: bool
+    default: true
+    description: Lets the detached deriver turn raw observations and native transcripts into derived records.
+  - key: features.transcripts
+    type: bool
+    default: true
+    description: Lets the deriver ingest native transcripts into SpecStory-pattern Markdown.
+  - key: features.persona
+    type: bool
+    default: true
+    description: Lets the deriver attach persona evidence through the identity port.
+  - key: features.views
+    type: bool
+    default: true
+    description: Lets the deriver refresh projections such as views/TOKENS.jsonl.
+  - key: features.mirror_sync
+    type: bool
+    default: true
+    description: Lets the deriver feed a provisioned SQLite or PostgreSQL mirror; inert until a backend is provisioned.
+  - key: capture.fsync
+    type: bool
+    default: false
+    description: Strict per-hook flushing; the hook fsyncs each observation before it exits, mirrored to the capture.fsync flag file.
+  - key: scope.exclude_roots
+    type: string
+    default: ""
+    description: Colon-separated root prefixes tellem never writes into (D-28); a repository under one is not a scope, its sessions are homed in the user scope, and the setting is mirrored to the scope.exclude_roots file in tellem's state. Empty by default.
+  - key: commands.full
+    type: bool
+    default: false
+    description: Per-scope opt-in to redacted full command lines in shells_out observations.
+  - key: workspace.sample_timeout_ms
+    type: int
+    default: 2000
+    description: Time bound in milliseconds for one git workspace sample.
+  - key: backend.kind
+    type: enum
+    options: [none, sqlite, postgres]
+    default: none
+    description: Mirror backend; none keeps the files as the only store.
+  - key: backend.location
+    type: enum
+    options: [scope, user]
+    default: scope
+    description: Where a SQLite mirror lives, in the scope's .tellem directory or in tellem's user state.
+  - key: backend.secret
+    type: string
+    default: postgres_url
+    description: Name of the SDK secret that holds the PostgreSQL URL, never the URL itself.
+  - key: specstory_writer
+    type: enum
+    options: ["off", auto, "on"]
+    default: auto
+    description: Whether projections also write .specstory/history copies after cutover; auto means when SpecStory is detected.
+  - key: visibility
+    type: enum
+    options: [public, private]
+    default: public
+    description: Per-scope declaration of the repository's visibility, read from .tellem/config.yml and never looked up from a remote; public keeps .tellem and .specstory/history out of git, private ignores only volatile files (D-17).
+  - key: cutover.state
+    type: enum
+    options: [shadow, cutover]
+    default: shadow
+    description: Capturer of record; set only by tellem cutover apply and rollback.
+  - key: persona.binding
+    type: enum
+    options: [none, auto, persona]
+    default: auto
+    description: Persona evidence source; auto binds when the persona extension detects the persona CLI.
+  - key: retention.native
+    type: bool
+    default: false
+    kill_switch: TELLEM_RETENTION_DISABLED
+    description: Lets the deriver remove verified native Claude Code transcripts after cutover; set only by tellem cutover apply and rollback (D-15).
+  - key: retention.native_days
+    type: int
+    default: 14
+    description: Resume window in days; a native session is a retention candidate only when its newest file is older. 0 is honored at spool and own, and removes a session's native files once it is derived final and verified (D-22).
+  - key: retention.purge
+    type: bool
+    default: false
+    description: Applies the retention check to every native session older than the applied plan, at apply and at later derives; set only by tellem cutover apply and rollback (D-22).
+  - key: authority.claude
+    type: enum
+    options: [observe, spool, rehearse, own]
+    default: observe
+    description: Transcript authority for Claude Code (D-22, D-23); set only by tellem cutover apply and rollback, and lowered by capture_lost or the stop switch.
+  - key: authority.codex
+    type: enum
+    options: [observe, spool]
+    default: observe
+    description: Transcript authority for Codex, which reaches spool at most (D-24); set only by tellem cutover apply and rollback.
+  - key: otel.receiver
+    type: bool
+    default: false
+    kill_switch: TELLEM_OTEL_DISABLED
+    description: Runs the loopback OTLP receiver for Claude Code usage details; set only by tellem cutover apply --otel and rollback, with the Claude settings env change (D-16).
+  - key: otel.port
+    type: int
+    default: 43180
+    description: Loopback port of the OTLP receiver.
+  - key: tasks.mode
+    type: enum
+    options: ["off", "on"]
+    default: "on"
+    description: "Task telemetry (D-19): on derives tasks from the record and shows their time and tokens in tellem tasks, tellem tokens --tasks, tree, and sessions; off does nothing. tellem adds no hook, marker reply, or status line for tasks."
+  - key: tasks.attribution
+    type: enum
+    options: [timeline, spans]
+    default: timeline
+    description: "How a main-agent request joins a task: timeline joins the task whose latest turn in that session began at or before the request, spans joins only inside an active span (D-18)."
+  - key: tasks.marker
+    type: string
+    default: "/task"
+    description: Prefix of the task marker command in a prompt.
+  - key: tasks.new_threshold
+    type: string
+    default: "3"
+    description: "JSON number: the score at or above which a prompt starts a new task."
+  - key: tasks.idle_points
+    type: string
+    default: '[[20,1],[60,2],[480,3]]'
+    description: JSON list of [minutes, points] steps scored by the idle gap since the task's last activity.
+  - key: tasks.closing_points
+    type: string
+    default: "2"
+    description: "JSON number: points when the previous turn carried a closing hint (commit, push, checkpoint, wip_removed)."
+  - key: tasks.repo_points
+    type: string
+    default: "0"
+    description: "JSON number: points when the repository differs from the task's."
+  - key: tasks.clear_points
+    type: string
+    default: "1"
+    description: "JSON number: points when the session started from a clear."
+  - key: tasks.overlap_low
+    type: string
+    default: "0.10"
+    description: "JSON number: word containment below which overlap_low_points applies."
+  - key: tasks.overlap_low_points
+    type: string
+    default: "1"
+    description: "JSON number: points for low word overlap with the task so far."
+  - key: tasks.overlap_high
+    type: string
+    default: "0.30"
+    description: "JSON number: word containment at or above which overlap_high_points applies."
+  - key: tasks.overlap_high_points
+    type: string
+    default: "-2"
+    description: "JSON number: points for high word overlap with the task so far."
+  - key: tasks.overlap_min_tokens
+    type: string
+    default: "4"
+    description: "JSON number: fewest distinct words a prompt needs for overlap to count."
+  - key: tasks.link_entrypoints
+    type: string
+    default: '["cli"]'
+    description: JSON list of session entrypoints whose clear-started session may link to a recent task.
+  - key: tasks.continuation_max_words
+    type: string
+    default: "8"
+    description: "JSON number: a prompt of at most this many words reads as a continuation."
+  - key: tasks.continuation_openers
+    type: string
+    default: '["yes","y","yep","yeah","ok","okay","go","also","and","now","then","that","this","it","fix","continue","proceed","do","sure","but","same","again","no"]'
+    description: JSON list of first words that mark a continuation.
+  - key: tasks.continuation_points
+    type: string
+    default: "-2"
+    description: "JSON number: points for a continuation prompt."
+  - key: tasks.question_points
+    type: string
+    default: "-2"
+    description: "JSON number: points when the last assistant message asked a question."
+  - key: tasks.question_cues
+    type: string
+    default: '["want me to","should i","shall i","would you like","do you want","which one","let me know"]'
+    description: JSON list of phrases that mark an assistant message as a question.
+  - key: tasks.workflow_commands
+    type: string
+    default: '["/feature","/bug","/change","/investigate","/is"]'
+    description: JSON list of workflow commands that always open a task.
+  - key: tasks.link_window_minutes
+    type: string
+    default: "60"
+    description: "JSON number: how recently a task was active to be a link candidate."
+  - key: tasks.link_min_overlap
+    type: string
+    default: "0.30"
+    description: "JSON number: least word containment for a link."
+  - key: tasks.autoclose_hours
+    type: string
+    default: "8"
+    description: "JSON number: idle hours after which a task closes."
+  - key: tasks.display_elapsed
+    type: enum
+    options: [freeze, now]
+    default: freeze
+    description: freeze stops elapsed at the last activity of an idle task, now keeps it running while the task is live.
+  - key: tasks.system_prompts
+    type: string
+    default: '["<agent-message","<cross-session-message","<task-notification","<teammate-message","This session is being continued from a previous conversation"]'
+    description: JSON list of prompt prefixes that are system messages and never open or score a task.
+  - key: transcripts.entries
+    type: bool
+    default: false
+    description: Lets the deriver write complete structured entries to sessions/KEY/entries/AGENT.jsonl, readable with tellem export (D-27); off changes nothing about reports, Markdown, or derived records.
+  - key: time.active
+    type: enum
+    options: [spans, activity, both]
+    default: spans
+    description: "How tree and state measure an agent's active time (D-34): spans uses the lifecycle turn spans, activity sums the gaps between the timestamps of the agent's derived records up to time.idle_seconds, both shows the two."
+  - key: time.idle_seconds
+    type: int
+    default: 300
+    description: Longest gap between two of an agent's derived records that activity counts as active time (D-34).
+
+serves: real_users
+polispec:
+  project: tellem
+  environments: specs/polispec/environments.yml

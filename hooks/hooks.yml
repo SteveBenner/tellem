@@ -1,0 +1,50 @@
+schema: rplugin.hooks/v1
+hooks:
+  - event: session_start
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", session_start, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: prompt_submit
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", prompt_submit, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: post_tool
+    match: any
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", post_tool, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: post_tool_failure
+    match: any
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", post_tool, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: stop
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", stop, "${HARNESS}"]
+    timeout_s: 2
+    blocking: false
+  - event: session_end
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", session_end, "${HARNESS}"]
+    timeout_s: 2
+    blocking: false
+  - event: subagent_start
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", subagent_start, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: subagent_stop
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-hook", subagent_stop, "${HARNESS}"]
+    timeout_s: 30
+    blocking: false
+    async: true
+  - event: session_start
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-otel", ensure]
+    timeout_s: 2
+    blocking: false
+  - event: prompt_submit
+    run: [ruby, "--disable-gems", "${PLUGIN_ROOT}/bin/tellem-otel", ensure]
+    timeout_s: 2
+    blocking: false

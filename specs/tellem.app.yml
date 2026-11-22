@@ -1,0 +1,1208 @@
+schema: tellem.application/v1
+name: tellem
+version: 0.9.0
+kind: rplugin
+status: conceptual
+recorded: '2026-10-21'
+supersedes:
+  spec: tellem.application/v1 0.1.0 (commit e40e31e) and 0.2.0 (commit ffeed52)
+  reason: >-
+    The maintainer redirected tellem from a modular telemetry platform to agent
+    telemetry, then made scoped files the record, with optional database
+    mirrors.
+  implementation_spec: >-
+    specs/tellem.impl.yml 0.1.0 is void. Linus replaces it from this design.
+    Code built against it is not authoritative; Linus decides what survives.
+purpose: >-
+  tellem is a flight recorder for coding agents. It records what every agent and
+  subagent said, what it spent, who it was, what state it was in, and where it
+  lived, stood, worked, and reached, so any session can be reconstructed as a
+  tree of agents moving through places. It needs nothing but the filesystem, and
+  can mirror into a database when one is wanted.
+
+actors:
+  - { id: operator, role: 'Reads reports, configures storage, provisions backends, approves shadow, cutover, migration, and prune.' }
+  - { id: harness, role: 'Claude Code or Codex. Emits hook events, writes native transcripts, owns agent and session identity.' }
+  - { id: agent, role: 'A main agent or a subagent. Observed, never asked to cooperate.' }
+  - { id: persona_source, role: 'Optional supplier of persona evidence for a session and time.' }
+  - { id: backend, role: 'Optional SQLite or PostgreSQL database that mirrors the record for queries.' }
+  - { id: specstory, role: 'Incumbent transcript renderer, when a host has it. Coexisted with, subsumed, or removed, as the operator configures (D-25).' }
+  - { id: incumbent_hooks, role: 'The SUBLOG subagent SpecStory hook and the TOKENS.jsonl ledger hook in ~/.ai, when a host has them. Retired at cutover.' }
+  - { id: coresident_plugin, role: 'Another plugin installed on the same host, such as one that ships tellem to its own users. It may read native transcripts, supply a transcript policy through a tellem extension, and read tellem''s entries (D-26, D-27).' }
+
+outcomes:
+  - { id: O-1, evidence: 'For any session, tellem shows every agent and subagent, their parent links and homes, and every place each one worked in and reached, without opening a transcript by hand.' }
+  - { id: O-2, evidence: 'Token totals per agent, subagent type, model, repository, place, and persona equal the provider-reported usage in the native transcripts, with each provider request counted once.' }
+  - { id: O-3, evidence: 'For every shadowed session, tellem transcripts are at parity with SpecStory, subagents beside their parents, before cutover is offered.' }
+  - { id: O-4, evidence: 'After cutover no SpecStory capture hook, wrapper, or TOKENS.jsonl hook is required, prior histories and ledgers are inside tellem, and cutover and import changed no source file. Native transcripts and SpecStory files leave the disk only later, through a verified and receipted step the operator configured (D-15, D-22, D-25).' }
+  - { id: O-5, evidence: 'A capture failure never blocks an agent or exceeds the hook budget, and is visible afterwards as a gap with its cause.' }
+  - { id: O-6, evidence: 'With no backend configured every report works from the files alone. Provisioning a backend, rebuilding it, or dropping it changes no report.' }
+  - { id: O-7, evidence: 'In any repository an agent worked in, tellem can say which sessions worked there, even when those sessions started elsewhere.' }
+  - { id: O-8, evidence: 'With tasks.mode on, tellem shows for any task its elapsed, active, and agent time beside the tokens its main agent and subagents spent, with the rate per agent-minute, in the same shape the task clock in ~/.ai reports it.' }
+  - { id: O-9, evidence: 'On any host, tellem transcripts discover names every mechanism that writes, expires, or reads an agent transcript there, with its evidence, whether it is active, and what tellem can do about it at the installed harness version, and changes nothing.' }
+  - { id: O-10, evidence: 'For each harness the operator can move transcript authority between observe, spool, and own, as far as that harness allows, through one reviewed plan with a rollback, and every report keeps working at every level. A level the harness cannot honor is refused with the reason.' }
+  - { id: O-11, evidence: 'tellem installs and works on a host with no SpecStory, no ~/.ai, no polispec, and no rStack, and is then the capturer of record with no cutover. On a host with SpecStory the operator can coexist with it, subsume it reversibly, or remove it, and with remove SpecStory stays gone and its readers keep their files.' }
+  - { id: O-13, evidence: 'For any session, tellem lists every message between its agents and to or from other sessions, with sender, recipient, channel, time, size, and a redacted head, joins a cross-session message to the receiving session when its scope is covered, and shows each agent''s wall, active, waiting, and spawn-to-stop time in tree and state (D-33, D-34).' }
+  - { id: O-12, evidence: 'tellem runs beside another plugin without disturbing it, and a plugin that ships tellem can run it on a Ruby of its own (D-26). A plugin that reads native transcripts is named before any plan takes them away. A coresident plugin can read complete structured entries from tellem and apply its own policy to them.' }
+
+scope:
+  in:
+    - Live capture through harness hooks, writing metadata only.
+    - A scoped file record in .tellem/ directories, with a user-level scope for sessions whose home is not a repository.
+    - Pointers in every repository a session touched, and a user-level registry of scopes.
+    - Transcripts as SpecStory-pattern Markdown, replacing SpecStory as capturer of record.
+    - Token accounting per provider request.
+    - Task tracking: grouping an agent's prompts into tasks, per-task elapsed, active, and agent time, and per-task tokens, taking over the grouping and timing of the task clock that ~/.ai runs today as telemetry only, with no hook, marker reply, or status line of its own (D-18, D-19).
+    - Native transcript retention after cutover. tellem removes a Claude Code session's own transcript files once the session's record is verified and a resume window has passed (D-15).
+    - Optional OpenTelemetry enrichment of Claude Code usage with effort, cost, and time to first token, received on loopback (D-16).
+    - Persona evidence per event.
+    - Agent state, meaning lifecycle, context, and workspace.
+    - Location, meaning home, standing place, working places, shell-out places, remote targets, and spawn sites.
+    - An out-of-hook deriver that turns raw observations into places, state, transcripts, pointers, projections, and backend mirrors.
+    - Optional SQLite and PostgreSQL mirrors, set up by provisioning code that ships with tellem.
+    - CLI reports, configuration, provisioning, rebuild, and prune.
+    - SpecStory compatibility, shadow, parity, cutover, and migration.
+    - Transcript method discovery across harness stores, expiry settings, switches, hooks, shell wrappers, watchers, repository outputs, OpenTelemetry exporters, and readers (D-21).
+    - Transcript authority per harness, observe, spool, or own, from one reviewed plan with rollback, including purge of verified native transcripts (D-22, D-23, D-24).
+    - SpecStory subsumption and removal, with prevention of its return (D-25).
+    - Coexistence with other plugins, a transcript policy port, and complete structured entries for them to read (D-26, D-27).
+    - Public source through a one-commit-per-release mirror under the MIT License, with a release export that scans before it commits (D-36).
+  harnesses: { first: [claude_code, codex], later: 'Other SDK harnesses through import only; recorded in ROADMAP.md.' }
+  exclusions:
+    - Tokenizer estimates or any token count not reported by a provider.
+    - Logger APIs, HTTP sinks, OTLP export, object stores, and any network destination other than a configured database backend. The only listener is the optional loopback OTLP receiver of D-16.
+    - OpenTelemetry enrichment for Codex in this release. Codex has its own OTLP exporter; it is recorded in ROADMAP.md.
+    - The own level for Codex. Interactive Codex offers no switch that stops rollouts, so spool is its ceiling (D-24).
+    - Approving tellem's own Codex hooks. Discovery reports them as untrusted and the operator trusts them in Codex (D-24).
+    - Replacing SpecStory's cross-agent resume, its other agents, its skills, or its cloud sync. A SpecStory plan says so before it applies (D-25).
+    - A bundled database, database file, or database driver. Drivers are optional and installed only through provisioning.
+    - Retrieval-vendor profiles and MCP wrapping.
+    - Policy enforcement and Polispec feature constraints.
+    - A dashboard in this release. It is recorded in ROADMAP.md.
+    - Aggregation across hosts. A PostgreSQL mirror is the expected path; it is recorded in ROADMAP.md.
+    - Automatic deletion of tellem's own record.
+    - Hidden reasoning, provider internals, or any state a harness does not expose.
+    - Full shell command lines, unless the operator opts in.
+
+domain:
+  concepts:
+    session: >-
+      One harness run, identified by the harness session id. It has a harness,
+      harness version, host, start, end, and a home place.
+    agent: >-
+      The main agent of a session or a subagent, identified by the harness agent
+      id. It has a parent agent (null for the main agent), the tool call that
+      spawned it, an agent type, model, effort, isolation (shared tree or its own
+      worktree), and a home place.
+    place: >-
+      A location something can be in or reach. A local place is a host plus a
+      real path. A remote place is a host, container, cluster, domain, or remote
+      repository. Places are recorded once and referenced everywhere.
+    repository: >-
+      The identity behind one or more local places: a git repository, identified
+      by its common git directory, with its sanitized remote URLs as attributes.
+      Worktrees of one repository are different places of the same repository.
+    scope: >-
+      A .tellem/ directory that holds the record of the sessions whose home it
+      is. A repository's scope sits at the top of its main working tree. The
+      user-level scope lives in the plugin's SDK state location and holds
+      sessions whose home is not a repository.
+    observation: >-
+      One thing that happened, appended once and never edited: a tool call, a
+      file read or written, a search, a shell exec, a spawn, a state change, a
+      message, a usage report, or a gap. It names an agent, a time, a kind, and
+      the places involved.
+    usage: >-
+      Tokens reported by a provider for one request, attributed to the agent that
+      made it, with input, output, cache-read, cache-creation, and reasoning
+      counters, and a total.
+    transcript: >-
+      The ordered, redacted messages and tool exchanges of one agent as exposed
+      by the harness, kept as SpecStory-pattern Markdown in the session's scope,
+      with each subagent transcript beside its parent's and linked from the
+      spawning call.
+    message: >-
+      One thing an agent said to another agent: a spawn prompt from parent to child,
+      a send to a subagent, the main agent, or an agent in another session, a
+      handback from child to parent, or a message a Codex child thread received. It
+      names the sender, the recipient (an agent key in the session, or a target in
+      another session), the channel, the time, the size, a redacted head and the
+      sender's summary, and the transcript turn that holds the whole text (D-33).
+    state: >-
+      Three layers over time. Lifecycle is started, running, waiting on the user,
+      stopped, or failed. Context is model, effort, persona, standing place, and
+      branch. Workspace is the git state of a place the agent works in: branch,
+      dirty or clean, worktree, ahead and behind.
+    persona_evidence: >-
+      Persona id, name, version, digest, revision, lead, forum members, speaker
+      when known, effective time, and authority, attached to the observations it
+      covers.
+    pointer: >-
+      A small record in the scope of a repository a session touched but does not
+      live in. It names the session, its home scope, the time range, and the
+      kinds of activity. It is a reference, never a copy.
+    registry: >-
+      A user-level list of every scope tellem has written, so a query can reach
+      every session on the host.
+    deriver: >-
+      The process that runs outside every hook and turns raw observations into
+      places, state, transcripts, pointers, projections, and mirrors.
+    backend: >-
+      An optional database that mirrors the record for fast queries. It is never
+      the record.
+    gap: >-
+      An observation that records missing capture: what was missed, when, why,
+      and how much is known about the loss.
+    transcript_method: >-
+      Anything on a host that writes, expires, or reads a record of an agent's
+      conversation: a harness store, an expiry setting, a switch, a hook, a shell
+      wrapper, a watcher, a repository output, an OpenTelemetry exporter, or a
+      reader. Each one has a kind, a harness, an owner, evidence, a state of
+      active, dormant, or unknown, and the controls tellem can offer for it.
+    authority_level: >-
+      Who holds a harness's transcript. At observe the harness writes and expires
+      its own files and tellem reads them. At spool the harness writes and tellem
+      removes each session's files once its record is verified. At own the harness
+      writes no transcript and tellem captures from what the harness delivers to a
+      directory tellem controls.
+    body_spool: >-
+      A directory in tellem's state, mode 0700, that receives Claude Code's raw API
+      request and response bodies at the own level. It holds plaintext briefly, like
+      the native transcript it replaces, until the deriver has ingested and redacted
+      it. It is a buffer, never the record.
+    entry: >-
+      One structured unit of a transcript, a prompt, reply, reasoning block, action,
+      or output, kept redacted and whole in the session's scope with a stable
+      sequence, for a coresident plugin to read (D-27).
+    transcript_policy: >-
+      What a tellem extension may supply through the transcript policy port: tool
+      names and path prefixes whose content is withheld before it enters the record,
+      and the names of the native transcripts it needs. The standalone form withholds
+      nothing and needs nothing.
+  location_verbs:
+    lives_in: The agent's home, the working directory where it started.
+    stands_in: The agent's working directory at a given time. It moves.
+    works_in: Every local place the agent read, searched, or wrote.
+    shells_out_from: The directory each shell command ran in, with the program that ran.
+    reaches: Every remote place a command or tool contacted, such as an ssh host, container, cluster, URL domain, or git remote.
+    spawned_at: >-
+      For a subagent, the place its parent stood in when it spawned it, and the
+      spawning call. The subagent's own home is recorded separately.
+  invariants:
+    - The files in the scopes are the record in every configuration. A backend is a mirror that can be rebuilt from them or dropped without loss.
+    - Observations are append-only. A correction is a new observation that supersedes an earlier one, never an edit.
+    - Every observation has a deterministic identity from its source, so replaying any capture, import, derivation, or mirror sync produces nothing new.
+    - A session's whole agent tree, including subagents that live in other repositories, is recorded in the session's home scope. Other repositories hold only pointers.
+    - A pointer may outlive its target. A dangling pointer reports its session as gone, never as data.
+    - The hook path persists metadata only. Message content, tool payloads, and command lines reach tellem only through redacting ingestion.
+    - A parent-child agent link exists only with evidence from a hook or a transcript. An unknown parent stays unknown.
+    - A place is identified by host and real path, never by a symlink spelling. Branch and dirtiness are time-stamped attributes of a place, not part of its identity.
+    - The repository is not the place. Two worktrees of one repository are two places.
+    - A remote place never carries credentials. URL userinfo, tokens in queries, and secrets in arguments are stripped before anything is stored.
+    - Each provider request is counted once. Claude content blocks sharing a message id share one usage; Codex cumulative and delta counters are never both charged; distinct requests with equal numbers stay distinct.
+    - A missing counter is null, not zero, and overlapping counters are never summed blindly.
+    - Unknown is never reported as a value. A workspace that was not sampled is unknown, not clean. A sample records its own time, never the time of the change it follows.
+    - Persona evidence is recorded with the events it covers and is never relabelled when the persona later changes. A forum lead is not assumed to be the speaker.
+    - Projections, meaning the TOKENS.jsonl view, SpecStory-location copies, and backend mirrors, can always be rebuilt from the record, and a rebuild of unchanged data changes nothing.
+    - Nothing in tellem's record is deleted except by an operator-confirmed prune. Files tellem does not own (native transcripts, SpecStory's program state and history) are deleted only under a plan the operator confirmed, only after the record is verified to hold what they held, and each deletion leaves a receipt with its sha256. A body spool file tellem has ingested is removed without a receipt, because it is a buffer.
+    - A session that ends with neither a native transcript nor a body spool leaves a capture_lost gap, and the first such gap returns that harness to its previous level for later sessions. At the own level this detection comes after the fact, so the session that reveals the loss cannot be recovered; a plan for own states that cost.
+    - A plan never takes native transcripts away from a discovered reader the operator has not named as accepted.
+
+journeys:
+  - id: J-1
+    name: Live capture
+    flow: >-
+      The harness fires a hook. The hook appends one metadata observation to the
+      session's home scope in a single write that survives any process crash,
+      and returns within the hook budget. The deriver flushes it to disk at its
+      next run; the operator can make every hook flush before it returns.
+      It loads no database, no driver, and no more code than the append needs.
+  - id: J-2
+    name: Subagent lifecycle
+    flow: >-
+      A spawn records the parent, the spawning call, and the requested type and
+      isolation. The subagent's start records its own home. Its stop records
+      lifecycle. The deriver later places its transcript beside the parent's.
+  - id: J-3
+    name: Derivation
+    flow: >-
+      At turn stop, subagent stop, and session end, the hook starts a detached
+      deriver for that scope and returns. The deriver also runs before a query and
+      on an explicit sync. It resolves places, samples workspace state, ingests
+      native transcripts into Markdown, aligns them to the hook observations,
+      writes pointers and the registry, refreshes projections, and feeds any
+      configured backend. One deriver runs per scope at a time, and a rerun
+      produces nothing new.
+  - id: J-4
+    name: Query
+    flow: >-
+      The operator asks for the agent tree, where an agent or its descendants
+      lived, stood, worked, and reached, which sessions worked in a repository,
+      the tokens by any dimension, state over time, and capture health. Queries
+      read the files, or the backend when one is configured and current. Every
+      report has a JSON form.
+  - id: J-5
+    name: Configure and provision
+    flow: >-
+      The operator chooses storage per user or per scope. Provisioning SQLite
+      creates a mirror database in the chosen scope's .tellem/ or at the user
+      level. Provisioning PostgreSQL creates the schema in a database the operator
+      names, with credentials held by the SDK secrets port. Provisioning installs
+      a driver only with the operator's consent, and a rebuild fills a new mirror
+      from the files.
+  - id: J-6
+    name: Prune
+    flow: >-
+      The operator states an age or size rule. tellem shows exactly which
+      sessions, transcripts, pointers, and mirror rows would go, and deletes them
+      only on confirmation. Prune never touches native harness transcripts,
+      SpecStory originals, or source repositories outside .tellem/; those leave only
+      through J-11 and J-12.
+  - id: J-7
+    name: Shadow
+    flow: >-
+      tellem captures alongside SpecStory and the ledger hook without writing
+      their files. A parity report compares tellem's transcripts and totals with
+      the incumbent outputs for every shadowed session. For a Codex session
+      it compares them with the rollout Codex itself wrote (D-20).
+  - id: J-8
+    name: Cutover and migration
+    flow: >-
+      On the operator's approval, one reviewed change retires what discovery found:
+      on a host with ~/.ai, the SpecStory subagent hook and the ledger hook, pointing
+      SUBLOG at tellem; on any host, the shell wrappers that run an agent through
+      SpecStory. The same step imports existing SpecStory histories and TOKENS.jsonl
+      ledgers into tellem without modifying them. The change is reversible. A host
+      with no incumbent needs none of this: tellem is already the capturer of record,
+      and parity reads no_incumbent, not unmet.
+  - id: J-9
+    name: Failure
+    flow: >-
+      When a scope is unwritable, the hook times out, a transcript is unreadable,
+      or a backend is down, the agent continues, the files keep what was
+      captured, and a gap records what was lost. A backend outage never blocks
+      capture or derivation into files.
+  - id: J-10
+    name: Discover
+    flow: >-
+      The operator asks what records transcripts on this host. tellem reads settings,
+      shell startup files, running processes, user timers, plugin packages, and
+      repositories it knows, and answers with every transcript method, every reader,
+      and every control available at the installed harness version, as text or JSON.
+      It writes nothing, starts no harness, and opens no credential file.
+  - id: J-11
+    name: Change authority
+    flow: >-
+      The operator asks for a level per harness. The plan shows each file it would
+      change, what the level costs (resume, rewind, each reader that loses its input),
+      and what it would purge. It refuses a level the installed harness cannot honor,
+      a level with an unaccepted reader, and own without body parity. On confirmation
+      it applies, and a later session's own evidence checks that the level took
+      effect. Rollback restores the files; files already purged stay gone, and their
+      receipts say so.
+  - id: J-12
+    name: Subsume or remove SpecStory
+    flow: >-
+      Subsume is part of the cutover plan and is reversible. Remove is a separate
+      confirmed step allowed only once subsumed. It deletes the wrappers and
+      registrations, SpecStory's state, and, with --history remove, each history file
+      whose content the record verifiably holds. It prints the package manager's
+      uninstall command for the operator. tellem keeps writing .specstory/history for
+      its readers unless the operator turns that off. Later derives report SpecStory's
+      return as drift and remove what the plan named.
+  - id: J-13
+    name: Alongside another plugin
+    flow: >-
+      A coresident plugin installs tellem or finds it installed. Its extension supplies
+      a transcript policy. tellem captures every session, withholding what the policy
+      names, and writes entries. The plugin reads entries from a cursor, applies its
+      own bounds, and sends what it chooses, and it can delete tellem's copy of what it
+      was responsible for. tellem sends nothing anywhere itself.
+
+quality_scenarios:
+  - id: Q-1
+    concern: Hook latency
+    scenario: >-
+      Every hook invocation adds bounded time to the agent's turn. Warm p99 is
+      below 50 ms (maintainer, 2026-10-21) and cold p99 below 1 s, for the whole hook
+      process including interpreter start.
+    evidence: >-
+      Measured 2026-10-21 on this host at load 4, 100 runs each, one append with
+      fsync. A bare Ruby without gems reached p99 8.6 ms. Ruby with default gems
+      reached 41 ms, with the sqlite3 gem 47 ms, and with the prior tellem
+      foundation loaded 53 ms. Only a minimal entrypoint fits the budget.
+  - id: Q-2
+    concern: Concurrency
+    scenario: >-
+      Several sessions and many parallel subagents capture into one scope at
+      once. No observation is lost, interleaved, or duplicated, and no agent waits
+      on another agent's capture beyond the budget.
+  - id: Q-3
+    concern: Crash
+    scenario: >-
+      A hook or deriver process is killed at any moment. Every acknowledged
+      observation survives, an interrupted write leaves no record that reads as
+      complete, and the next deriver run completes the work.
+  - id: Q-4
+    concern: Growth
+    scenario: >-
+      Years of sessions accumulate in a scope. Hook cost does not grow with
+      history size, and file-only queries over large histories remain usable; a
+      mirror is the remedy when they do not.
+  - id: Q-5
+    concern: Workspace sampling cost
+    scenario: >-
+      Git state is sampled by the deriver, never holds git's locks, and is
+      abandoned at a time bound, leaving the workspace unknown.
+  - id: Q-6
+    concern: Harness drift
+    scenario: >-
+      A harness changes its hook payload or transcript format. tellem records the
+      unrecognized shape as a gap with the harness version instead of guessing.
+  - id: Q-7
+    concern: Privacy
+    scenario: >-
+      A secret appears in a message, a tool argument, a command, or a URL. It is
+      absent from every scope file, transcript, pointer, projection, mirror,
+      report, and diagnostic.
+  - id: Q-8
+    concern: Backend outage
+    scenario: >-
+      The PostgreSQL server is unreachable for a day. Capture and derivation into
+      files continue unchanged, the mirror reports how far behind it is, and it
+      catches up without duplicates when the server returns.
+  - id: Q-9
+    concern: Harness switch drift
+    scenario: >-
+      A harness update changes or removes a switch tellem relies on. Discovery shows
+      the switch as absent at the new version, the own level reads unverified, and a
+      session that kept writing natively, or that delivered no bodies, becomes a gap
+      that returns the harness to its previous level. No session is silently lost
+      beyond the one that revealed the change.
+  - id: Q-10
+    concern: Ruby floor
+    scenario: >-
+      tellem runs from the floor D-26 names through Ruby 4.0 with identical output, and the
+      hook meets Q-1 on each. Below the floor the hook exits 0, captures nothing, and records
+      why in a bounded state file, and every CLI command names the Ruby and exits nonzero.
+  - id: Q-11
+    concern: Coresident plugin failure
+    scenario: >-
+      A transcript policy extension that raises, hangs, or returns the wrong shape
+      withholds by failing closed: the affected session's entries wait, a gap records
+      why, and capture continues.
+
+trust_boundaries:
+  - Hook payloads are trusted as harness-originated only through the installed hook transport. Fields a caller supplies elsewhere are evidence, never authority.
+  - A transcript path is read only when it arrives in a trusted hook payload or as an explicit operator argument. A path inside a record is data.
+  - Scope files, transcripts, pointers, and SQLite mirrors are readable only by the operator's account.
+  - tellem writes only inside .tellem/ directories, the user-level scope, its state directory, and a configured backend, plus ignore rules for .tellem/ and the reviewed cutover change. It never follows a symlink out of a scope, with one exception a plan must name: a .specstory symlink whose target the operator approved in that plan (D-25). Under a confirmed plan it also removes native transcript files under the harness's own transcript root, only for sessions whose record is verified (D-15, D-22), and never a file reached through a symlink, and SpecStory files as D-25 states.
+  - Body spool files are read only from the directory tellem itself named in the plan. A body_ref or path inside a harness event is data.
+  - tellem discards the account and organization attributes on OpenTelemetry events, and redacts bodies before anything reaches a scope. It stores no system prompt or tool schema from a request body.
+  - Discovery reads plugin packages only to find transcript readers, and it runs nothing from them.
+  - A repository a session touched receives at most a pointer, and an unwritable repository yields a gap, never an error to the agent.
+  - The only network destination is a configured database backend. No hook opens a connection, and the database client carries a rate limiter, bounded jittered retries, timeouts, and a kill switch.
+  - The optional OTLP receiver binds 127.0.0.1 only and accepts a request only with its bearer token. Its events are evidence that enriches a usage observation already derived from a native transcript; they never create usage or change a counter.
+  - Backend credentials live only in the SDK secrets port.
+  - Persona evidence is evidence. A name is not authentication.
+  - tellem reads host state only through the plugin SDK and declared ports, and has no rStack wire. A persona binding lives in an extension with an rStack-free default of unknown.
+  - tellem never edits ~/.ai, a harness setting, a hook, or a shell startup file except through a reviewed plan the operator approves.
+  - ~/.ai is optional. It is one place discovery looks, and tellem needs nothing from it (D-26).
+  - tellem never reads the task clock's store under ~/.local/state/agent-clock except from a path the operator passes to the tasks parity command. It builds its tasks from its own record (D-18).
+
+decisions:
+  - id: D-1
+    decision: Scoped files are the record on every host. Databases are optional mirrors.
+    rationale: >-
+      Files need no dependency, survive without any service, and fit the hook
+      budget, where loading a database driver alone takes 47 ms. A mirror keeps
+      queries fast without becoming a second record that can disagree.
+    alternatives: [one central database as the record (0.2.0), a database replacing the files when configured]
+    revisit_when: Cross-host aggregation is scheduled.
+  - id: D-2
+    decision: Hooks supply location and state; native transcripts supply content and usage; they join on session, agent, and tool-call identity.
+    rationale: Hooks see working directories and spawns live but carry no usage. Transcripts carry usage and content but lose the live working directory.
+    alternatives: [transcripts only, hooks only]
+    revisit_when: A harness exposes both in one channel.
+  - id: D-3
+    decision: The metadata record is structured append-only files; the transcript record is SpecStory-pattern Markdown. Everything else is a projection.
+    rationale: >-
+      The maintainer chose files for metadata and the SpecStory Markdown pattern for
+      transcripts. Native transcripts are deleted after a retention period, by the
+      harness or, after cutover, by tellem's verified retention (D-15), so
+      tellem's Markdown becomes the only surviving copy and must be a record, not
+      a disposable render.
+    alternatives:
+      - transcript content inside the metadata files with Markdown rendered from it
+      - a MessagePack transcript record, dropped by the maintainer on 2026-10-21 after it measured only 4% smaller than JSON on a real transcript
+    revisit_when: The Markdown pattern proves unable to hold a harness's exchanges faithfully.
+  - id: D-4
+    decision: Shell commands are recorded as directory, program, and extracted remote places, without the command line.
+    rationale: Command lines carry secrets; location questions need only where and what.
+    alternatives: [full command lines redacted]
+    revisit_when: The operator opts into full commands for a scope.
+  - id: D-5
+    decision: >-
+      There is one transcript format. The SpecStory writer only adds SpecStory's
+      .specstory/history location as a second output, defaults on when SpecStory
+      is detected and off otherwise, and writes there only once tellem is the
+      capturer of record.
+    rationale: During shadow, SpecStory still writes those files; writing them too would overwrite the incumbent and make parity unmeasurable.
+    alternatives: [write SpecStory's location during shadow]
+    revisit_when: SpecStory is uninstalled or the operator retires the location. D-25 pins the writer on after a removal, because detection would otherwise turn it off.
+  - id: D-6
+    decision: Migration takes, per session, the best surviving source.
+    rationale: >-
+      A native transcript is complete and authoritative while it exists. A
+      SpecStory file is lossy and is labelled as such. A ledger row has weak
+      identity. One authority per session prevents double counting.
+    alternatives: [import every source and deduplicate afterwards]
+    revisit_when: Sources disagree on totals for a session.
+  - id: D-7
+    decision: Cutover is one reviewed, reversible change to ~/.ai after parity is shown.
+    rationale: SUBLOG, the subagent hook, and the ledger hook are stack-wide. A partial switch leaves two capturers of record.
+    alternatives: [cut over at first release, run both permanently]
+    revisit_when: Parity cannot be reached for a harness; that harness keeps its incumbent. D-25 removes the need for ~/.ai or parity on a host with no incumbent.
+  - id: D-8
+    decision: The hook path appends one metadata observation that survives any process crash and returns. All other work, including flushing it to disk, belongs to the deriver, unless the operator chooses strict flushing in the hook.
+    rationale: The 50 ms warm budget includes process start, and the measurements in Q-1 leave room only for a minimal append.
+    alternatives: [derive places, sample git, or write a database inside the hook]
+    revisit_when: Measurements show more work fits inside the budget with margin.
+  - id: D-9
+    decision: Every .tellem/ directory, including transcripts, pointers, projections, and any SQLite mirror in it, is kept out of git by default.
+    rationale: Transcripts can carry sensitive content, and the record must not leak through a push.
+    alternatives: [commit history by default, commit only the ledger view]
+    revisit_when: The operator opts a repository into committed history. Amended by D-17 (0.4.1), which keeps this default for every repository not declared private.
+  - id: D-10
+    decision: Derivation runs in a detached process started at turn stop, subagent stop, and session end, before queries, and on explicit sync. There is no resident daemon.
+    rationale: A daemon needs supervision, startup, and recovery of its own. Detached runs at natural boundaries keep the record current without one.
+    alternatives: [resident daemon, derivation only on query]
+    revisit_when: Derivation lag at session end becomes visible to the operator.
+  - id: D-11
+    decision: A session lives in its home scope; every other repository it touched receives a pointer; a user-level registry lists all scopes.
+    rationale: >-
+      The tree stays whole in one place, and a repository can still answer who
+      worked in it. The maintainer accepted writing pointers into repositories a session
+      did not start in.
+    alternatives: [home scope with registry only, split records by place]
+    revisit_when: Pointer writes into third-party repositories cause harm.
+  - id: D-12
+    decision: SQLite and PostgreSQL mirrors are supported through a backend port and provisioning code that ships with tellem. No database or driver ships.
+    rationale: The maintainer wants tellem lean, with databases available on demand.
+    alternatives: [SQLite only, SQLite plus PostgreSQL plus MySQL]
+    revisit_when: Another database is requested; it plugs into the same port.
+  - id: D-13
+    decision: Records are deleted only by an explicit prune that shows its effect first and acts on confirmation.
+    rationale: The record is the only copy once harness transcripts expire. Silent loss is worse than growth.
+    alternatives: [automatic age-based pruning, no prune at all]
+    revisit_when: Scope size becomes a problem the operator does not notice.
+  - id: D-14
+    decision: Configuration has three layers, built-in defaults, user settings through the SDK, and per-scope settings inside .tellem/, with the scope winning.
+    rationale: Storage, SpecStory output, and opt-ins such as full commands differ by repository.
+    alternatives: [user settings only]
+    revisit_when: A setting must be enforced across all scopes.
+  - id: D-15
+    decision: >-
+      After cutover, Claude Code's own transcripts are a spool. tellem removes a
+      session's native transcript, its subagent transcripts, and its tool-result
+      files once the session is derived final, the request count and every token
+      counter re-read from the native files at that moment equal tellem's usage
+      records, every agent's Markdown transcript is written, and the newest native
+      file is older than the resume window (default 14 days). The cutover plan the
+      operator confirms is what turns retention on.
+    rationale: >-
+      The maintainer chose this on 2026-10-22. Claude Code 2.1.308 cannot stop writing
+      transcripts in an interactive session (cleanupPeriodDays has a minimum of 1;
+      only --no-session-persistence with --print and the SDK's persistSession:
+      false disable writes), and its own copies hold secrets unredacted, 8.6 GB
+      across 2,992 files on this host. Claude's write stays the durable buffer
+      that resume, rewind, and live readers need; tellem's redacted record is the
+      copy that remains. No raw backup is kept, because keeping one would keep the
+      plaintext.
+    alternatives: [Claude's own cleanupPeriodDays with no verification, keep native transcripts as they are, capture before disk and disable the write]
+    revisit_when: A harness can stream its full transcript to tellem without writing it, or a session must be resumed after the window. The first fired on 2026-11-05 for Claude Code 2.1.318; D-23 adds the own level and this decision stands for spool.
+  - id: D-16
+    decision: >-
+      tellem may receive Claude Code's OpenTelemetry logs on a loopback OTLP/HTTP
+      receiver and keep, per provider request, the effort, cost, time to first
+      token, duration, and query source of its api_request event as a usage detail
+      joined by request id. Transcripts stay the only source of usage counters and
+      content. The receiver needs no content switches and asks for none.
+    rationale: >-
+      The maintainer chose this on 2026-10-22. In a real Claude Code 2.1.308 session the
+      api_request events matched the native transcript on 3 of 3 requests and
+      every counter, and carried effort, cost, and time to first token, which no
+      transcript or hook supplies. The same export lacked tool output, thinking,
+      subagent replies, and the message tree, so it cannot replace the transcript.
+    alternatives: [no OpenTelemetry, OpenTelemetry as the usage source, an API proxy through ANTHROPIC_BASE_URL]
+    revisit_when: Transcripts carry effort and cost, or the export carries the full transcript. At the own level D-23 sets the raw body switch; everywhere else this decision stands.
+  - id: D-17
+    decision: >-
+      A repository's visibility is declared in its scope's settings as
+      visibility public or private, and a repository with no declaration is
+      public. tellem never asks a remote, a host API, or a credential. In a
+      public repository every store tellem writes into the working tree is
+      ignored by git through a .gitignore of its own containing '*': the .tellem/
+      scope and the SpecStory history copy. In a private repository tellem
+      writes no such ignore file, so the operator may commit the record, the
+      transcripts, the views, and the SpecStory history; only volatile machinery
+      (locks, cursors, dirty flags, and any SQLite mirror file) stays ignored.
+      tellem never runs git add, git rm, or git commit, and never edits a
+      repository's own .gitignore or .git/info/exclude.
+    rationale: >-
+      The maintainer chose this on 2026-10-23. Transcripts and ledgers can carry sensitive
+      content, so a repository that may be public must not leak them through a
+      push, while a private repository may keep its agent history beside its
+      code. A declaration is the only signal that needs no network and no
+      credential, and defaulting to public fails closed.
+    alternatives: [ask the remote host's API, infer visibility from the remote URL, ignore in every repository as D-9 first stated]
+    revisit_when: A repository needs part of its record committed and part ignored, or tellem writes a store outside .tellem/ and .specstory/history.
+
+  - id: D-18
+    decision: >-
+      D-19 withdraws the live mode, its synchronous hook step, the /task marker
+      replies, and the status line segment described below; everything else here
+      stands. tellem absorbs the task clock that ~/.ai runs in claude/hooks/task_clock.py
+      behind one setting, tasks.mode, with the values off, shadow, and live. A
+      task is a run of one person's prompts about one piece of work, started and
+      ended by the same rules the task clock uses today: a score over the idle
+      gap, repository change, word overlap with the task so far, continuation
+      words, and question cues against a threshold; workflow commands that open
+      a task; the /task markers new, done, split, merge, resume, and status;
+      linking a clear-started session to a recent task; and auto-close after
+      idle hours. The rules and their defaults are the tasks.* settings, equal
+      at install to claude/hooks/agent-clock.json. A task carries its sessions,
+      its turns with active spans, and its subagents with start and end, and its
+      elapsed, active, and agents time are computed by the same formulas and
+      shown in the same format as the task clock (elapsed from the first prompt,
+      active as the sum of main-agent spans, agents as active plus subagent
+      time). One engine serves every mode. In shadow, the deriver replays the
+      engine over a session's recorded prompts, subagent starts and stops, and
+      tool events, and writes task records beside the rest of the record; the
+      hook stays asynchronous, silent, and metadata-only, and no shadow run
+      changes what an agent sees. In live, an additional synchronous hook step
+      runs the same engine at prompt time, keeps working state under the state
+      directory, answers /task markers, and serves the status line segment; its
+      state holds, per task, a fingerprint of redacted words and a 120-character
+      redacted head of each prompt, and nothing else from message content. Task
+      records are derived: a rebuild from the record produces the same tasks,
+      and reports read the derived records, never the live working state.
+      Tokens join to tasks exactly: a main-agent request belongs to the task
+      whose latest turn in that session began at or before the request's time
+      (tasks.attribution timeline, or only inside active spans with spans), and
+      a subagent request belongs to the task that holds its agent id. tellem
+      reports total_tokens and output_tokens per task with a rate per
+      agent-minute, in tellem tasks, tellem tokens --tasks, and as columns of
+      tree and sessions. tellem tasks parity compares derived tasks with the
+      task clock's own store for a path the operator supplies. CHECKIN
+      checkpoint enforcement (agent_clock.py) is not part of this decision.
+    rationale: >-
+      The maintainer asked on 2026-10-30 to track tokens per agent thread and task
+      compatibly with the task clock, then chose full absorption as a toggle:
+      one system should own both the time and the tokens of a task, and a join
+      across two stores keyed by separate heuristics would drift. A mode switch
+      keeps the existing hook contract (asynchronous, silent, metadata-only,
+      under 50 ms) whenever the feature is off or in shadow, and confines the
+      synchronous, user-visible, content-fingerprinting step to live, where
+      the operator opts in. Shadow reuses tellem's own shadow, parity, and cutover
+      pattern, so the status line moves only after the derived tasks have been
+      compared with the 126 tasks the clock stored.
+    alternatives: [read the task clock's store and join tokens to it, import the clock's task records without grouping of its own, move only the totals and leave grouping in ~/.ai, absorb CHECKIN checkpoints as well]
+    revisit_when: The task clock's rules change in ~/.ai after cutover, a task needs content beyond a bounded fingerprint, or the live step cannot hold the 50 ms warm budget.
+
+  - id: D-19
+    decision: >-
+      tellem keeps the task telemetry of D-18 and drops the clock's user
+      interface. tasks.mode takes off and on, and on is the default. There is no
+      live mode: tellem registers no synchronous task hook, answers no /task
+      marker, serves no status line segment, and keeps no working state or
+      tasks.live flag under the state directory. Tasks are derived from the
+      record only, so the hook path persists metadata only with no exception. The
+      engine still reads a /task marker that a recorded prompt contains, because
+      the clock in ~/.ai acts on it and the derived tasks must agree. Reports,
+      attribution, rates, the task record kind, and tellem tasks parity are as in
+      D-18. The task clock stays in ~/.ai and keeps its status line, markers, and
+      CHECKIN checkpoints; tellem edits none of them.
+    rationale: >-
+      The maintainer said on 2026-10-30, after reading tellem tasks on real sessions, that
+      the telemetry belongs in tellem and the clock's TUI features do not. Dropping
+      live removes the only synchronous, content-fingerprinting hook step and the
+      one exception to the metadata-only hook, and leaves ~/.ai the one owner of
+      what an agent sees.
+    alternatives: [keep live behind the toggle and leave it unused, keep live and decide at cutover, drop only the status line and keep the marker replies]
+    revisit_when: The operator wants the status line or the marker replies from tellem, or the task clock is removed from ~/.ai.
+
+  - id: D-20
+    decision: >-
+      A shadowed Codex session is judged at parity against the rollout that
+      Codex wrote for it, not against an incumbent output. The rollout is the
+      file named by the transcript_path in the session's own hook records. A
+      reference reader that shares no parsing code with the ingestion re-reads it:
+      the user and assistant message texts, and the provider-reported counters,
+      taken from the per-request token_usage_record entries when the rollout has
+      them and otherwise from the distinct last_token_usage entries of the
+      token_count events, with input_tokens net of cached_input_tokens as in
+      the incumbent ledger's Codex rows. Transcript turns are compared by
+      the existing parity rules (redaction-tolerant, thinking and tool turns
+      excluded) and counters by sum and request count. A session whose rollout
+      is still being written is pending, not a mismatch. The last 5 shadowed
+      Codex sessions at parity this way satisfy the Codex half of FR-24. Where
+      the rollout's own cumulative total_token_usage differs from its per-request
+      records, the difference is reported as accepted, never as a mismatch. Claude
+      sessions are judged as before.
+    rationale: >-
+      Codex has no incumbent transcript or ledger writer beside tellem, so the
+      "with incumbent output" criterion could never be met for it. The rollout is
+      the one record of what Codex did that tellem did not itself produce, and a
+      second reader of it checks that the hook, redaction, alignment, derivation,
+      and rendering kept what it holds. It does not check that the rollout is
+      what the model saw.
+    alternatives: [drop the Codex criterion, compare only token counters, require an incumbent writer for Codex, compare against the Codex app server's thread API]
+    revisit_when: Codex gains an incumbent capture beside tellem, the rollout format changes, or Codex subagent rollouts need their own reference.
+
+  - id: D-21
+    decision: >-
+      tellem transcripts discover reports every transcript method on the host and is
+      read-only. It covers harness stores and their sizes, expiry settings, switches
+      and whether the installed harness carries them, prompt histories, hooks in
+      harness settings and in ~/.ai when present, shell wrappers in startup files,
+      running wrapper and watcher processes, user timers and cron entries, SpecStory's
+      state and its per-repository output including vault links, OpenTelemetry
+      exporters, Codex hook trust, and readers. Readers are the harness's own features
+      that open a transcript, every command registered as a hook, ~/.ai when present, and
+      installed plugin packages that name native transcript paths or fields. A capability is reported with
+      how it is known: declared by a version table, seen in the installed binary, or
+      verified by a session's own evidence. Unknown stays unknown.
+    rationale: >-
+      The maintainer asked for discovery so tellem can take the operation over. Measured on
+      2026-11-05, this host's main SpecStory channel was a shell function in ~/.bashrc
+      that the cutover's discovery never reads, and Claude Code 2.1.318 had gained a
+      switch that a hard-coded capability would have missed. A harness changes faster
+      than a spec, so a capability must be found, not assumed.
+    alternatives: [a fixed capability table per version, probing by running real sessions at discovery time, discovery only inside the cutover plan]
+    revisit_when: A harness publishes a capability API.
+
+  - id: D-22
+    decision: >-
+      Each harness has one authority level, observe, spool, or own, raised only through
+      the reviewed cutover plan (--claude LEVEL, --codex LEVEL), lowered by that plan's
+      rollback, capture_lost, or the stop switch (D-23), and defaulting to observe. Spool generalizes D-15 and adds purge: retention.native_days may be 0,
+      which removes a session's native files once it is derived final and verified,
+      and --purge applies the same check to every older native session at apply and
+      at later derives. Discovery's readers are bound into the plan id, and a reader
+      not named by --accept-reader refuses the plan. retention.native_days below 1
+      with an accepted reader is allowed only because the operator named it. The
+      existing refusals, rollback, and plan id rules apply.
+    rationale: >-
+      The maintainer said on 2026-11-05 that deleting and preventing native transcripts is fine
+      when tellem is configured that way, to save disk (11 GB of Claude transcripts and
+      1.7 GB of Codex rollouts on this host). One reviewed plan keeps D-7's rule that a
+      partial switch leaves two capturers of record, and naming readers keeps a saving
+      on disk from silently breaking another tool.
+    alternatives: [a separate command per harness, live settings the operator flips directly, refuse readers with no override]
+    revisit_when: A level needs to differ by repository; a project-level harness setting could scope it.
+
+  - id: D-23
+    decision: >-
+      The own level exists for Claude Code. The plan sets, through settings.json env,
+      CLAUDE_CODE_SKIP_PROMPT_HISTORY=1, telemetry with OTEL_LOG_RAW_API_BODIES=file:
+      <body spool>, and the existing loopback OTLP receiver for the event stream. The
+      deriver reads the spool's index and bodies, attributes each request to its session
+      and agent, and produces the same usage, transcript, and entry records as native
+      ingestion, then removes the files it ingested. Hook observations join as before.
+      Own is refused until a body parity report has compared bodies with native
+      transcripts over real sessions run with both on, for every agent in the tree, and
+      any difference it finds is named in the plan. The maintainer chose this on 2026-11-05, after
+      real sessions on 2.1.318 found differences, and accepted none yet. A rehearse level
+      earns that report on a real host with native writes still on.
+      A liveness check runs per session: a native file that appears is level_ineffective;
+      a session with hook or OpenTelemetry evidence of a provider response whose body is
+      missing, truncated, not recorded, or withheld is capture_lost, and so is one with no
+      index line within the bound after its first response. capture_lost writes a visible
+      gap and restores native writes for later sessions by rewriting the same settings the
+      plan changed, until the operator plans own again. A spool directory that is missing,
+      unreadable, or wrongly owned at derive counts the same. A stop switch does the same
+      restore and also halts retention, purge, and SpecStory drift removal, whatever the
+      applied plan says: tellem authority stop acts at once, and an environment variable or
+      a flag file acts at the next derive, with an unreadable flag read as set. The hook only
+      appends, as D-8 requires, and spool files wait for a fixed deriver, so a broken tellem
+      delays ingestion and loses nothing the harness delivered. This amends D-2, D-15, and
+      D-16 at this level only.
+    rationale: >-
+      The maintainer asked on 2026-10-22 to take transcripts before they reach disk and switch the
+      write off, and D-15 recorded that it could not be done on 2.1.308. Measured on
+      2.1.318 on 2026-11-05 in scratch homes: the switch left 0 native JSONL files in
+      print mode and in an interactive session with a subagent, and from settings.json
+      env; hooks kept firing with a transcript_path that never exists; the file mode
+      delivered complete request and response bodies where inline bodies stop at 60 KB;
+      and Claude Code itself warns that --resume will not find the session. The maintainer chose
+      this, gated, on 2026-11-05. The MADSCI initial assessment found the file mode documented
+      as untruncated, an index that needs 2.1.274 or later, body write failures that reach only
+      the debug log, an internal condition that can disable body logging, and about 25 harness
+      releases a month, so a harness can stop delivering bodies with no error. The liveness
+      check and the restore are what make the level safe to depend on, and until they exist own
+      stays refused. At own the harness's resume, rewind, and logs have nothing to open, and on
+      this host 12 files in ~/.ai read transcript_path, so each is a reader the plan must name.
+      Body files arrive mode 664, so the spool directory's 0700 is the boundary.
+    alternatives: [stop at spool, hooks only, inline bodies, an API proxy through ANTHROPIC_BASE_URL]
+    revisit_when: Subagent attribution from bodies cannot be proven, the switch is removed, or Claude Code offers a supported transcript sink.
+
+  - id: D-24
+    decision: >-
+      Codex reaches spool at most. Removal uses codex delete with the thread id, so its
+      own state database stays consistent, and falls back to holding the session when
+      that verb is missing or fails. A Codex session is final by the end-of-transcript
+      rule plus the retention window, since it has no session end. Discovery reports
+      history.persistence, rollouts, and the state database, and a Codex plan may set
+      history.persistence to none. tellem never writes a trust entry for its own hooks;
+      discovery says they are untrusted and how the operator trusts them in Codex.
+    rationale: >-
+      Codex 0.166 lists --ephemeral only under codex exec, and interactive rollouts have
+      no observed off switch. Removing rollouts behind Codex's back would leave threads
+      its state database still lists. On this host 450 of 962 rollouts were already
+      .jsonl.zst on 2026-11-05, which tellem cannot read yet, so a session whose rollout it
+      cannot read is held, never removed. A plugin that approves its own hooks defeats the
+      prompt that protects the operator.
+    alternatives: [unlink rollouts directly, write trusted_hash from the plan, leave Codex at observe]
+    revisit_when: Codex adds a way to stop interactive rollouts.
+
+  - id: D-25
+    decision: >-
+      SpecStory has three dispositions. Coexist is today's shadow. Subsume is part of the
+      cutover plan: it removes the wrappers discovery found from shell startup files,
+      retires hooks, imports history, and leaves the program and every SpecStory file in
+      place, and rollback restores each file byte for byte. Remove is tellem specstory
+      remove, allowed only once subsumed, with its own plan id and per-file receipts: it
+      deletes SpecStory's user state, its per-repository files other than history, and
+      with --history remove (default keep) each history file the record verifiably holds,
+      and it prints the uninstall command for the operator to run. A removal cannot be
+      rolled back. Once remove is applied, specstory_writer is pinned on unless the
+      operator set it off, so readers of .specstory/history keep their input, and later
+      derives report drift when a wrapper, hook, or program returns and remove the wrappers
+      and state the plan named. A .specstory symlink is written through only when the plan
+      names its target; otherwise it is skipped and reported. On a host with no incumbent,
+      tellem is capturer of record from its first session. tellem search covers SpecStory's
+      search over tellem's transcripts. A plan states what is not replaced: cross-agent
+      resume, other agents, skills, and cloud sync, and any cloud copy, which tellem cannot
+      delete. This amends D-5, D-7, D-13, J-6, and O-4.
+    rationale: >-
+      The maintainer asked that tellem replace the need for SpecStory and subsume it destructively or
+      nondestructively, and said on 2026-11-05 that preventing it from existing is fine when
+      configured. Two steps keep the irreversible part behind a reversible one that has
+      already been lived with. A vault tool on the maintainer's host links .specstory across
+      repositories and worktrees, so a writer that refuses every symlink would starve them.
+    alternatives: [one verb with a flag, delete history by default, follow every symlink, uninstall the package from tellem]
+    revisit_when: A reader of .specstory/history moves to tellem directly, so the writer can stop.
+
+  - id: D-26
+    decision: >-
+      tellem installs and works beside another plugin with no wire into it and no need for
+      rStack. ~/.ai is optional, and the cutover plans against what discovery found rather
+      than requiring it. The floor is Ruby 3.3, with one code path. A plugin that ships tellem
+      to a computer below the floor runs it on a Ruby of its own by absolute path. The
+      transcript policy port is declared by tellem with a standalone default that withholds
+      nothing; a plugin ships a tellem extension to implement it. Withheld content is replaced
+      by a placeholder before it enters the record. tellem names no plugin in its code. How a
+      plugin ships tellem to its own users is that plugin's decision; D-36 publishes tellem's
+      source and supersedes the clause that kept it unpublished.
+    rationale: >-
+      The maintainer said on 2026-11-05 that a coresident plugin should ship and install tellem
+      through a clean bridge, and chose not to publish yet. The maintainer first chose a 2.6.10
+      floor, on a count of tellem's own files. The rplugin SDK that tellem's CLI and deriver
+      load states Ruby 3.3 or newer, and in ruby:2.6.10-slim 5 of its 50 lib files failed to
+      parse, including settings.rb, so no CLI command could run there. The maintainer then
+      chose 3.3 through that plugin's kit. Its launcher already carries a pinned 4.0.7 kit
+      Ruby, so a stock Mac is still reached, at the cost of a download of about 58 MB once, and
+      tellem keeps one Ruby and one code path. The polispec plugin-ruby-2-6-floor rule stays
+      deleted unless the maintainer restores it.
+    alternatives: [a 2.6.10 floor for the hook alone, lower the SDK to 2.6.10 for every plugin, tellem's own fallback for the SDK on old Rubies, tellem detects the plugin by name, the plugin reads tellem's files directly]
+    revisit_when: The rplugin SDK changes its Ruby floor.
+
+  - id: D-27
+    decision: >-
+      With transcripts.entries on, the deriver also writes entries: redacted, whole, ordered
+      records of each agent's prompts, replies, visible reasoning, actions, and outputs. Unlike
+      the Markdown, entries omit nothing for size or tool, so an Edit's input is present though
+      the Markdown leaves it out; a body over the record bound is split into consecutive parts. tellem export reads entries from a cursor and is the only interface a
+      plugin uses; tellem sync --session makes them current on demand. Off by default, so a
+      plain install stores no reasoning, as D-3 and the parity rules assume. A level that cannot
+      supply reasoning says so, and a reader that needs it counts as a reader in D-22.
+    rationale: >-
+      A coresident plugin sends visible reasoning to its server, and its transcript stream
+      standard says nothing is cut to fit, splitting over 120000 bytes, while tellem's Markdown
+      stores no thinking and omits tool payloads over 262144 bytes. The maintainer chose on
+      2026-11-05 to replace only that plugin's transcript capture, keeping its upload route, so
+      the plugin needs tellem's data in a form it can map to that route without reading Markdown.
+    alternatives: [the plugin parses Markdown, the plugin reads native transcripts as it does now, a bundle route to the plugin's server]
+    revisit_when: The plugin's server takes a tellem package directly.
+  - id: D-28
+    decision: >-
+      tellem never writes into a root the operator excludes. The setting scope.exclude_roots
+      names root prefixes and is empty by default. A repository under one is not a scope:
+      a session started there has its home in the user scope, no pointer or registry entry
+      is written there, and no derive or removal touches it. The session keeps its record,
+      including the paths it worked in. tellem removes nothing already there; doctor lists
+      it for the operator.
+    rationale: >-
+      A deployed tellem wrote .tellem into polispec production release checkouts whenever a
+      session touched one, found on 2026-11-05, and a deriver write is not a tool call, so
+      the guard never saw it. The maintainer chose a hotfix release so the writes stop before 0.3.0.
+      The names of a host's protected places belong to the host, so the default names none.
+    alternatives: [hard-code the polispec environment path, build it into 0.3.0 only, report the defect and change nothing]
+    revisit_when: A host needs a protected root tellem must still record into.
+  - id: D-29
+    decision: >-
+      Parity compares what each side recorded as turns, not what a tool printed. A line shaped
+      like a turn heading inside a tool-use block is tool output on both sides and starts no
+      turn. A subagent whose tellem transcript ends with its SubagentHandback tool turn, and
+      whose incumbent transcript lacks only that turn, is at parity for that agent and the
+      difference is listed as accepted with the reason subagent_final_report and a count.
+      Nothing else about the criteria of FR-24 changes: a different trailing turn, a second
+      extra turn, and the same difference on the main thread stay mismatches.
+    rationale: >-
+      Measured 2026-11-06 over the host's Claude sessions. Parity read a heading-shaped line
+      printed by a tool as a new turn, so any session that printed transcript text, such as
+      tellem's own development sessions, failed on turns that exist on neither side (session
+      e817b5ae, 10 such turns). SpecStory also omits the subagent's final report that tellem
+      renders, so every subagent session failed on a turn tellem holds and the incumbent
+      lacks (sessions 10294a2a, 5265df67, 8405ee55). Both read as mismatches that no cutover
+      could clear, and neither is a loss of capture.
+    alternatives: [accept any turn-count excess on a subagent, accept every difference in a session that printed transcript text, leave the criteria and count these sessions as failures]
+    revisit_when: SpecStory renders the subagent's final report, or a harness shows a tool turn that is not delimited by a tool-use block.
+  - id: D-30
+    decision: >-
+      Parity reads the incumbent ledgers the incumbent wrote to. The incumbent token logger
+      writes each row to the TOKENS.jsonl of the repository its cwd is in, found by walking up
+      from the cwd to the nearest directory with a .git, stopping at the session's launch
+      directory, mapping a linked worktree to its main checkout, and falling back to the
+      launch directory when the target is not writable. Parity applies the same walk to every
+      tellem row and reads each other ledger it names, at most 64, for the session's rows. A
+      ledger that cannot be read adds nothing, so its rows stay tellem-only and the session
+      stays a mismatch. No difference is accepted.
+    rationale: >-
+      Measured 2026-11-06. Session bb33c2a5 ran requests with its cwd in two nested Codex
+      scratch repositories. The incumbent wrote those three rows to the nested repositories'
+      ledgers, parity read only the scope root's ledger, and the session read as three
+      tellem-only rows. Any session that works across repositories fails the same way,
+      although tellem and the incumbent agree. The routing was ported from the incumbent's
+      resolve_target and gave identical targets on 12 real and absent paths, including a
+      linked worktree and a deleted directory.
+    alternatives: [accept tellem-only rows whose cwd is outside the scope root, accept tellem-only rows on any session that moved between repositories, leave the session failing]
+    revisit_when: The incumbent changes where it writes, or it is retired at cutover.
+  - id: D-31
+    decision: >-
+      The assignment redaction does not take prose between two code spans as a quoted value.
+      A name inside a backtick code span, closed directly after its separator, as in
+      `` `x-api-key:` ``, does not pair that closing backtick with the next code span's opening
+      backtick when the text between them starts with whitespace and the closing backtick is
+      followed directly by non-space text. Every other assignment form redacts as before, and a
+      value glued to the closing backtick still redacts.
+    rationale: >-
+      Measured 2026-11-06. The redactor turned `` `x-api-key:` - converting a curl from an API
+      key is a header change, not a key swap). Always pass `--access-token` `` into
+      `` `x-api-key:`[REDACTED:assignment]`--access-token` ``, replacing about 96 characters of
+      prose, because the closing backtick of the name's span opened a quoted value that ended at
+      the next span's opening backtick. tellem is the record of the session, so a redaction that
+      destroys prose is a loss of record even though it errs toward privacy. A first narrowing
+      that skipped any such value would have exposed a secret glued to the closing backtick,
+      found by a control, so the whitespace test is part of the rule. Over 278105 unique strings
+      from the 60 most recent sessions, 8 outputs differed, all this pattern. The cost is that
+      a secret written after a closed name span and a space, then followed by a code span with
+      no space, is no longer redacted by this rule.
+    alternatives: [skip every quoted value that starts at the closing backtick of the name's span, leave the over-redaction, redact only when the value contains no whitespace]
+    revisit_when: A secret is found in the form the cost names, or the redactor parses code spans as a whole.
+  - id: D-32
+    decision: >-
+      tellem spans is a read verb over derived records that returns timed spans for requests,
+      tool calls, subagents, and task turns as rows in the tellem.report/v1 envelope, filtered
+      by session, task, agent subtree, kind, and time. One derived kind is added, tool_call
+      {tool_use_id, agent_key, tool, started_at, ended_at, duration_ms, is_error}, written by the
+      deriver from the tool calls it already pairs, once the result is in the transcript. A
+      request's duration is the OpenTelemetry usage_detail duration_ms when present
+      (duration_source otel); otherwise the gap from the recorded request_start to the request's
+      last usage_line (duration_source transcript); otherwise null with duration_source none.
+      request_start {harness, request_key, started_at} is a second derived kind, written by the
+      deriver with the timestamp of the transcript entry (prompt, tool result, or resume
+      message) immediately preceding the request's first line in the same agent thread. A subagent span runs
+      from its first started or spawn time to its stopped or failed state and is open when it has
+      none. A turn span is a task turn's prompt time to the end of its last active span. Rows
+      carry metadata only, and token fields are the provider-reported counters of the requests
+      they cover.
+    rationale: >-
+      Histograms of time and token spend per turn and per group of subagent actions need
+      per-span times, which tellem tokens and tellem tasks only aggregate. Spans are a
+      projection, so the verb never reads a native transcript and a tool call needs one
+      observation to be timed. A tool_call is written only when answered because its identity
+      is [session_key, tool_use_id] and an append-only record cannot gain a later result_at.
+      A request with no preceding entry has no duration rather than a guessed one.
+      request_start is its own kind because usage_detail has identity [harness, request_key] with
+      the first event winning, so a transcript row would block or be blocked by the OpenTelemetry
+      row, and usage_line identity ignores its body, so a new field would never backfill. An
+      earlier report-time inference from tool results overstated the request after a resumed
+      subagent's handback (8466686 ms), which the recorded start fixes.
+    alternatives: [read native transcripts in the verb, infer the start at report time from tool results, add a start field to usage_line, add a transcript source to usage_detail, add start and end fields to usage, write tool_call before its result and supersede it, estimate a missing request duration from its output tokens]
+    revisit_when: A harness reports request latency in its transcript.
+  - id: D-33
+    decision: >-
+      The deriver writes a message record for everything one agent says to another, on
+      four channels. spawn: the prompt of a spawning call, parent to child. send: a
+      SendMessage call in Claude Code, or a send_input or send_message call in Codex, to a
+      subagent, the main agent, or a target in another session. handback: the result of a
+      spawning call, child to parent, unless the call launched the child in the background,
+      whose result only acknowledges the launch and whose report arrives as a receive. receive: what an agent was handed by another agent,
+      a Codex agent_message item in a child thread, or a Claude Code cross-session-message,
+      agent-message, or teammate-message tag in a queue-operation enqueue record, a
+      queued_command attachment, or a user turn, with its from, from-name, and from-mode
+      attributes. The copies of one delivery in one agent (enqueue, attachment, and turn)
+      are one receive record: the earliest copy, joined by digest within 600 seconds. A
+      record names its session, sender and recipient
+      agent keys when they are agents of the session, the raw target or sender address
+      otherwise, the channel, the time, the byte size, the sender's summary when the call
+      has one, a redacted head of at most 200 bytes, a body digest, and the source id of
+      the turn that holds the whole text. The whole text stays in the transcript and
+      entries; a message record never holds more than its head. The digest is SHA-256 over
+      the redacted whole text, so both sides of one message give the same digest and no
+      digest is taken over unredacted text. A cross-session message is recorded by each
+      session in its own scope, the send by the sender and the receive by the receiver,
+      and a report joins the two by digest and time across the scopes it covers. Content
+      the transcript policy withholds for a tool is withheld from the head and digest too.
+    rationale: >-
+      The maintainer asked on 2026-11-18 for the messages agents send to be first-class telemetry.
+      Before this, SendMessage, send_input, and spawn prompts were only tool calls of kind
+      agent and Codex agent_message was a user turn, so no record named who said what to
+      whom. Measured 2026-11-18 over 14 days of this host's Claude Code transcripts: 351
+      SendMessage calls to targets outside their session, 252 by name and 99 by socket,
+      and the receiving transcript held each one as a cross-session-message whose text
+      equals the sender's. The maintainer chose the head and summary over the whole body, so the
+      content controls (forget, transcript policy, visibility) need no new store.
+    alternatives: [whole redacted body in the record, metadata only, sender side only for cross-session sends]
+    revisit_when: A harness changes how it delivers messages between sessions, or a report needs the whole text without the transcript.
+  - id: D-34
+    decision: >-
+      Agent time is computed at report time from lifecycle records, spawn records, and the
+      agent's derived records, and is never stored. An agent's end is the later of its
+      stopped or failed record and its last activity record (the kinds activity reads below),
+      because a subagent resumed
+      after a stop keeps working while its write-once stopped record stays at the first
+      stop; with no final record the agent is open and its end is its last activity record.
+      Records stamped at derive time, such as persona, never set an end.
+      Wall time runs from an agent's first started record to its end. Waiting is the sum of
+      spans from waiting_on_user to the next running, for the main agent only. Spawn to
+      stop runs from the spawning call to the subagent's end, for subagents with a final
+      record only. Active time has two definitions behind the
+      setting time.active. spans, the default, sums each prompt-to-stop span of the main
+      agent from its lifecycle records, and start to stop for a subagent. It can be a few
+      seconds below the task clock's active time, because the task clock also opens a span
+      for a main-agent tool call that lands after a stop and lifecycle records mark running
+      only at a prompt. activity sums the gaps between consecutive timestamps of the
+      agent's derived records (usage, tool_call, works_in, shells_out, message,
+      lifecycle, and context), leaving out each gap longer than time.idle_seconds, so it
+      needs no transcript entries; a tool call still waiting for its result has no
+      tool_call record yet and counts only through its other records. both shows the two side by side. tellem tree shows
+      each agent's wall, active, waiting, and spawn-to-stop time, and tellem state shows the
+      same figures for one agent with the active definition named.
+    rationale: >-
+      The metrics section has named agent wall, active, waiting, and spawn-to-stop time
+      since 2026-10-21, and no report computed them; only per-task time existed. The maintainer chose
+      both active definitions behind a toggle on 2026-11-18, with spans as the default.
+      Measured the same day: spans matched every lifecycle span of the task clock and fell
+      1.4 s and 2.9 s below task active on two single-task sessions, from tool calls after a
+      stop; the maintainer chose to state the difference over deriving extra running records, and
+      chose derived records over transcript entries for activity, because entries are off
+      by default. The tool_call kind of D-32 joined the activity sources when 0.4.0 and
+      this change met on main, so every answered tool call counts.
+    alternatives: [turn spans only, tool activity only, store computed times as records]
+    revisit_when: A harness reports agent time itself, or the task clock changes its formula.
+  - id: D-35
+    decision: >-
+      Parity judges a transcript turn the same when it equals the incumbent's turn after
+      tellem's own redactor runs on the incumbent's raw turn text, in addition to the
+      marker matching of redaction_only; both count as redaction_only. A tellem turn whose
+      only difference is an [image omitted] placeholder the incumbent leaves out is accepted
+      as image_placeholder. When the incumbent's turns are an accepted prefix of tellem's,
+      the extra trailing tellem turns are accepted as incumbent_truncated. When tellem's
+      turns are an accepted prefix of the incumbent's, the agent's cause is tellem_behind,
+      and a session whose every transcript cause is tellem_behind, with no session_end
+      record and a last record under 24 hours old, is pending. Inside a tool-use block a
+      line ending </tool-use> closes the block only outside a fenced code block, so a tool
+      output that quotes a rendered transcript starts no turns. A session's token rows are
+      pending when its only difference is tellem-only rows, each no older than the newest
+      ledger row of the same agent, the rest matches, and the session is open as above;
+      this replaces the single end_turn row rule. cutover stays unmet while any session is
+      pending.
+    rationale: >-
+      Measured 2026-11-18 on the 20 sessions that failed parity: redaction marker spans
+      over 64 characters or of zero length (a quoted empty value), tool output quoting a
+      SpecStory transcript in three sessions (b3712d8f, a0b28599, dbf9be87), SpecStory
+      files that stopped growing after a subagent was resumed (12 agents), and image
+      placeholders (2) made every transcript mismatch; none was a capture defect. tellem's
+      redactor applied to the incumbent's turn explained every tellem-side redaction
+      exactly. Live sessions failed because the incumbent ledger logs a turn's rows at
+      Stop and a subagent's at SubagentStop. After the change the last 20 Claude sessions
+      are 20 of 20 with no session that was at parity before losing it.
+    alternatives: [raise the 64 character marker span, accept turn count differences without a prefix check, strip image placeholders silently, keep the single end_turn row rule]
+    revisit_when: tellem's redactor or the SpecStory history format changes.
+  - id: D-36
+    decision: >-
+      tellem's source is public. The development repository stays private, and a release
+      export publishes each version to a public mirror as one commit with no shared history,
+      tagged v<VERSION>, under the MIT License. The export leaves out development records,
+      implementation blueprints, environment policy, and the roadmap, replaces AGENTS.md with
+      a public one, and commits nothing while its own scan or the host's exposure scan finds a
+      private name, a home path, an email outside the allowed set, or a secret shape. Each
+      allowance for a pattern is named in the release configuration by file, pattern, and
+      reason, and an allowance that matches nothing stops the export. Shipped text names no
+      private project and no person other than the copyright holder. Outside issues and pull
+      requests are welcome; a pull request is re-applied in the development repository and
+      never merged on the mirror. Publishing source ships tellem to no plugin's users and
+      changes no install.
+    rationale: >-
+      The maintainer chose on 2026-11-07 to publish through the same one-commit-per-release
+      mirror rplugin uses, so polispec's documentation can point at an installable tellem, and
+      on 2026-11-22 to generalize private wording in place, so the mirror is main minus the
+      excluded paths and one text serves both. Development history, notes, and blueprints name
+      private projects, so they never reach the mirror, and a mirror with no shared history
+      cannot expose them by commit id. The redactor's own detection patterns contain secret
+      prefixes, which is why allowances exist and why each must name its file.
+    alternatives: [move the repository to the public host with its history restarted, keep tellem private, rewrite private wording at export time, leave the specification and docs out of the mirror]
+    revisit_when: Development moves to the public repository, or a plugin ships tellem to its own users.
+
+metrics:
+  status: Confirmed by the maintainer, 2026-10-21.
+  tokens: Per request, and aggregated by agent, subagent type, model, effort, repository, place, persona, and day.
+  time: Agent wall time, active time between tool calls, time waiting on the user, and time from spawn to stop (D-34). Per task, when tasks.mode is on, elapsed, active, and agents time, and tokens per agent-minute.
+  messages: Messages between agents by sender, recipient, channel, and session, with cross-session sends linked to the receiving session when its transcript shows the delivery (D-33).
+  activity: Tool calls by kind and outcome, reads, writes, and execs per place, denials and failures, and subagent fan-out by count, depth, and concurrency.
+  locality: Share of activity outside the agent's home, places per agent, writes across repositories, and remote places reached.
+  capture_health: Gaps by cause, hook latency, derivation lag, mirror lag, unrecognized payload shapes, and parity against incumbents during shadow.
+
+downstream_specifications:
+  owner: Linus
+  specifications:
+  - id: IS-1
+    purpose: The file record.
+    decides: >-
+      Scope layout, file formats and versions, identities and supersession, the
+      append protocol under many concurrent writers, crash behavior, pointer and
+      registry formats, ignore-rule handling, permissions, and how hook cost stays
+      flat as a scope grows.
+    depends_on: []
+    acceptance: Replay idempotence, kill-at-any-point survival, parallel-writer runs without loss or interleaving, and append times measured against Q-1 at large scope sizes.
+  - id: IS-2
+    purpose: Live capture per harness.
+    decides: >-
+      The minimal hook entrypoint, which hook events each harness and version
+      provides and what each yields, agent identity when payloads lack it, the
+      metadata kept from each payload, deriver start, and the failure path to a
+      gap.
+    depends_on: [IS-1]
+    acceptance: Real Claude Code and Codex sessions with nested subagents and worktree isolation produce complete raw observations, and hook latency meets Q-1 on the reference host.
+  - id: IS-3
+    purpose: The deriver.
+    decides: >-
+      Triggers, one-run-per-scope exclusion, resumable and idempotent progress,
+      place resolution, workspace sampling bounds, pointer and registry writes,
+      projection refresh, and backend feeding.
+    depends_on: [IS-1, IS-2]
+    acceptance: The correct agent tree, homes, standing places, spawn sites, and pointers for real sessions; kill-and-rerun leaves the scope identical to an uninterrupted run.
+  - id: IS-4
+    purpose: Shell-out and remote-place extraction.
+    decides: The recognized programs (at least ssh, scp, rsync, docker, kubectl, curl, wget, and git remotes), their target rules, credential stripping, and how unrecognized commands are recorded without guessing.
+    depends_on: [IS-1]
+    acceptance: Synthetic commands carrying secrets in arguments, URLs, and environment produce places without any secret; unrecognized commands record directory and program only.
+  - id: IS-5
+    purpose: Transcript and usage ingestion.
+    decides: Readers for Claude main and subagent transcripts and Codex rollouts, the SpecStory-pattern Markdown layout with subagents beside parents, alignment to hook observations, redaction rules, usage accounting under the invariants above, and partial-file recovery.
+    depends_on: [IS-1, IS-3]
+    acceptance: Totals equal provider-reported usage over real sessions, three replays change nothing, Markdown is accepted by the readers that read SpecStory history, and secret sentinels never persist.
+  - id: IS-6
+    purpose: Persona evidence binding.
+    decides: The identity port, its rStack-free default, the extension that reads persona session evidence, and transitions across load, forum, lead change, and unload.
+    depends_on: [IS-1]
+    acceptance: A session with persona transitions attributes each event to the persona in effect, keeps the speaker unknown where it is unknown, and never relabels history.
+  - id: IS-7
+    purpose: Projections.
+    decides: The TOKENS.jsonl view compatible with the incumbent ledger, the SpecStory-location writer and its activation states, and byte-stable rebuilds.
+    depends_on: [IS-3, IS-5]
+    acceptance: Rebuilds of unchanged data change no byte, and the TOKENS.jsonl view matches the incumbent schema.
+  - id: IS-8
+    purpose: Backends and provisioning.
+    decides: >-
+      The backend port, the SQLite and PostgreSQL schemas and migrations,
+      provisioning per scope or per user, driver installation with consent,
+      mirror sync and lag reporting, rebuild and drop, and the database client's
+      limiter, retries, timeouts, and kill switch.
+    depends_on: [IS-1, IS-3]
+    acceptance: Each backend provisioned in an isolated home, mirrored, rebuilt, and dropped with identical reports throughout; a PostgreSQL outage leaves file capture unaffected and the mirror catches up without duplicates.
+  - id: IS-9
+    purpose: CLI and configuration.
+    decides: Commands for the tree, location queries, sessions per repository, tokens, state, capture health, sync, config, provisioning, rebuild, prune, import, shadow, parity, and cutover, with exit codes and JSON forms, and the three configuration layers.
+    depends_on: [IS-1, IS-3, IS-5, IS-8]
+    acceptance: Each outcome O-1 to O-7 can be demonstrated from the CLI on real sessions, and prune shows its effect before deleting anything.
+  - id: IS-10
+    purpose: Shadow, parity, cutover, and migration.
+    decides: >-
+      Parity criteria against SpecStory and the ledger, the reviewed ~/.ai change
+      for SUBLOG and both hooks, every other ~/.ai rule that names SpecStory or
+      TOKENS.jsonl (such as DECLOG's commit rule), rollback, and the importer for
+      histories and ledgers under D-6.
+    depends_on: [IS-5, IS-7, IS-9]
+    acceptance: A parity report over shadowed sessions, a dry-run cutover plan, a reversible applied cutover in an isolated home, and an import that leaves every source file unchanged.
+  - id: IS-11
+    purpose: Packaging and records.
+    decides: The rplugin manifest, SDK hook surfaces per harness, install and doctor checks, FEATURES.md with honest status, and ROADMAP.md for the dashboard, other harnesses, and cross-host aggregation.
+    depends_on: [IS-2, IS-9]
+    acceptance: SDK check and doctor report zero findings in an isolated home, and FEATURES.md separates built, verified, and deployed.
+  - id: IS-12
+    purpose: Transcript method discovery.
+    decides: The method record, the sources read and their bounds, the version table, binary and evidence probes, reader search, and the report.
+    depends_on: [IS-9]
+    acceptance: On this host it finds the ~/.bashrc wrappers, the vault links, the SpecStory hooks, the Claude switch, and the known readers, on an empty isolated home it reports no incumbent, and either way no file changes.
+  - id: IS-13
+    purpose: Authority levels and own capture.
+    decides: The plan additions, spool purge, Codex removal, body spool layout and ingestion, agent attribution, body parity, effect evidence, and the restore.
+    depends_on: [IS-5, IS-10, IS-12]
+    acceptance: Real scratch sessions at each level produce equal reports, body parity holds over a tree with a subagent, a forced loss restores native writes for the next session, and rollback restores every file.
+  - id: IS-14
+    purpose: SpecStory disposition.
+    decides: Wrapper edits, the no-incumbent path, tellem search, the remove plan and receipts, drift, and vault link handling.
+    depends_on: [IS-10, IS-12]
+    acceptance: In isolated homes, subsume and rollback restore every byte, remove leaves readers their files with receipts for all else, and a returned wrapper is reported and removed.
+  - id: IS-15
+    purpose: Coexistence.
+    decides: The Ruby floor, the transcript policy port, entries, export, sync by session, and the private install path.
+    depends_on: [IS-5, IS-9]
+    acceptance: tellem runs identically on Ruby 3.3 and 4.0 and refuses visibly below 3.3, a policy withholds what it names before the record, a failing policy fails closed, and export round-trips a session with parts and reasoning.
+
+carried_forward:
+  bounds: { record_bytes: 8388608, nesting_depth: 64, tool_payload_bytes: 262144 }
+  over_limit: >-
+    Oversized records are rejected with a content-free diagnostic naming the
+    source position. Oversized tool payload content is omitted with a visible
+    marker so the rest of the record, including usage, is kept.
+  harness_matrix:
+    claude_code: Hooks plus main and subagent transcripts, or at the own level hooks plus a body spool; capability verified against the installed version.
+    codex: Hooks where available plus rollout import; session end is not assumed; spool at most.
+
+open_questions: []
+
+resolved_questions:
+  - { id: OQ-1, answer: 'The .tellem/ directory is ignored by default (D-9).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-2, answer: 'Writing to SpecStory means SpecStory-format files in .specstory/history/ (D-5). No cloud sync.', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-3, answer: 'The metrics are confirmed as proposed.', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-4, answer: 'Warm hook p99 tightens to 50 ms; cold p99 stays at 1 s (Q-1, D-8).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-5, answer: 'Scoped .tellem/ files are the record; SpecStory-pattern Markdown holds transcripts; SQLite and other databases are optional, provisioned on demand, never shipped (D-1, D-3, D-12).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-6, answer: 'A configured backend mirrors the files and is never the record (D-1).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-7, answer: 'A session lives in its home scope, with pointers in every repository it touched (D-11).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-8, answer: 'SQLite and PostgreSQL ship as provisioned mirrors (D-12).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-9, answer: 'Nothing is deleted except by an explicit, confirmed prune (D-13). Amended on 2026-11-05: files tellem does not own may leave under a confirmed plan (D-22, D-25).', by: maintainer, on: '2026-10-21' }
+  - { id: OQ-10, answer: 'Build the own level, gated (D-23).', by: maintainer, on: '2026-11-05' }
+  - { id: OQ-11, answer: 'Keep Ruby 3.3, reached on old computers through a coresident plugin''s kit, after first choosing 2.6.10 and learning that the rplugin SDK needs 3.3 (D-26).', by: maintainer, on: '2026-11-05' }
+  - { id: OQ-12, answer: 'A coresident plugin ships a tellem extension. tellem replaces that plugin''s transcript capture only; its debug events, faults, code scan, and signed work record stay. tellem records every session locally and the plugin sends in-bounds work through its own upload route. The plugin''s privacy policy changes to say so and argues the value of keeping interactions (D-26, D-27).', by: maintainer, on: '2026-11-05' }
+  - { id: OQ-13, answer: 'Do not publish tellem yet. Build the tellem side and the bridge and test on the maintainer''s machines through a private install (D-26). Superseded on 2026-11-22 by D-36.', by: maintainer, on: '2026-11-05' }
+  - { id: OQ-14, answer: 'Publish tellem''s source through a one-commit-per-release mirror under the MIT License; the development repository stays private, and publishing source ships tellem to no plugin''s users (D-36).', by: maintainer, on: '2026-11-22' }
+
+handoff_to_linus:
+  - Resolve IS-1 first; every other specification depends on its formats, identities, and concurrent append behavior.
+  - Prove the minimal hook entrypoint against Q-1 before fixing anything else in IS-2.
+  - Decide which parts of the prior build survive. They carry no authority from this design.

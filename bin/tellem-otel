@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+plugin_root = File.expand_path("..", File.dirname(File.realpath(__FILE__)))
+
+case ARGV[0]
+when "ensure"
+  begin
+    $stdout.reopen(File::NULL, "w")
+    require File.join(plugin_root, "lib", "tellem", "otel", "ensure")
+    Tellem::Otel::Ensure.run(plugin_root)
+  rescue StandardError, ScriptError => e
+    if defined?(Tellem::Otel::State)
+      Tellem::Otel::State.merge("state" => "ensure_failed", "error_class" => e.class.name, "updated_at" => Tellem::Otel::State.now)
+    end
+  end
+  exit 0
+when "serve"
+  rplugin_home = ENV.fetch("RPLUGIN_HOME", nil)
+  rplugin_home = File.expand_path(rplugin_home && !rplugin_home.empty? ? rplugin_home : "~/.rplugin")
+  require File.join(rplugin_home, "lib", "rplugin")
+  require File.join(plugin_root, "lib", "tellem")
+  require File.join(plugin_root, "lib", "tellem", "otel", "receiver")
+  exit 0 if Tellem::Otel::Settings.disabled?
+
+  token = begin
+    Rplugin::Ports.for(Tellem::Ports::HarnessPaths::PLUGIN_ID, root: plugin_root).secrets.get(Tellem::Otel::Settings::SECRET).to_s
+  rescue Rplugin::MissingSecret
+    ""
+  end
+  result = Tellem::Otel::Receiver.serve(token: token, inherited: ARGV[1] == Tellem::Otel::Settings::INHERIT_FLAG)
+  exit(%i[idle_exit busy].include?(result) ? 0 : 1)
+else
+  warn "usage: tellem-otel ensure | serve"
+  exit 2
+end

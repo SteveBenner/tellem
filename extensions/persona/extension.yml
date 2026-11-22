@@ -1,0 +1,17 @@
+schema: rplugin.extension/v1
+id: persona
+kind: os
+catalogue_version: "2.7.1"
+description: Backs tellem's declared identity port with persona.session/v1 evidence from the local persona CLI.
+provides: [identity]
+confidence: verified
+detect:
+  - command: persona
+requires: []
+adapters:
+  identity: lib/identity.rb
+notes: >
+  Plugin-local extension. snapshot runs persona status --harness H --session S
+  with a 3 s bound and reads its persona.session/v1 JSON; from_tool_result parses
+  the same document from persona status, load, lead, and unload tool results
+  seen in transcripts. It installs nothing, so plan.sh emits no links.

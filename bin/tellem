@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+if (RUBY_VERSION.split(".")[0, 2].map(&:to_i) <=> [3, 3]) < 0
+  require "rbconfig"
+  $stderr.puts("tellem needs Ruby 3.3 or newer; this is Ruby #{RUBY_VERSION} at #{RbConfig.ruby}")
+  exit 1
+end
+
+rplugin_home = ENV["RPLUGIN_HOME"]
+rplugin_home = File.expand_path(rplugin_home && !rplugin_home.empty? ? rplugin_home : "~/.rplugin")
+require File.join(rplugin_home, "lib", "rplugin")
+require File.expand_path("../lib/tellem", File.dirname(File.realpath(__FILE__)))
+
+exit Tellem::CLI.run(ARGV)

@@ -1,0 +1,116 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" session_start claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-otel\" ensure",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" prompt_submit claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-otel\" ensure",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" post_tool claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" post_tool claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" stop claude-code",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" session_end claude-code",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" subagent_start claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby --disable-gems \"${CLAUDE_PLUGIN_ROOT}/bin/tellem-hook\" subagent_stop claude-code",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
