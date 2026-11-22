@@ -1,5 +1,12 @@
 # tellem record formats
 
+> **Normative specification:** [`specs/tellem.yml`](../../specs/tellem.yml)
+> defines every format field by field, extracted from the code. This page is
+> the narrative companion. Where the two differ, the spec is right; its
+> `doc_drift` section lists the points where this page is known to be
+> incomplete or wrong, and its `unresolved` section lists what is not yet
+> settled.
+
 This is the reference for every file tellem writes. It restates `data_model` of
 `specs/tellem.impl.yml` 0.2.0 and names the concrete choices the foundation code
 (`lib/tellem/record/`, `lib/tellem/ids.rb`) makes where the spec leaves the

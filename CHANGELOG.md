@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-22
+
+### Added
+
+- `specs/tellem.yml`, the normative field-level specification of every file
+  tellem writes and every machine-readable output it prints: 45 formats in
+  three planes (capture, derived, control), with types, required fields,
+  enums, bounds, writers and readers, and invariants. It was extracted from
+  the code and cross-checked against `Record::Formats`, `Record::Kinds`, every
+  schema id in `lib/`, and the manifest's 52 settings. It names 20 points still
+  unresolved and 43 places where `docs/reference/formats.md` is incomplete or
+  wrong; that page now defers to the spec.
+
+### Changed
+
+- `docs/architecture.md` is an engineering document: system context,
+  components, the capture, derive, and read paths as sequence diagrams and
+  flow charts, scope resolution, storage layout and record relationships,
+  durability and concurrency, the authority state machine, the cutover
+  sequence, and the invariants, all as Mermaid diagrams that name the module
+  behind each step. The illustrated figures stay in the README.
+
 ## [0.5.6] - 2026-11-22
 
 ### Added

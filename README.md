@@ -361,7 +361,9 @@ A session is a tree of agents, and each agent moves through places. tellem recor
   <img src="docs/assets/figures/04-authority-ladder.png" alt="Taking over, one rung at a time: observe, spool, rehearse, and own, each step a reviewed plan, with a rollback arc back to observe; Codex stops at spool" width="100%">
 </p>
 
-tellem starts out beside whatever already records your sessions and changes nothing. If you later want it to take over, it climbs one rung at a time, and every rung is a plan you read before it applies. [docs/architecture.md](docs/architecture.md) walks through all four figures in more depth.
+tellem starts out beside whatever already records your sessions and changes nothing. If you later want it to take over, it climbs one rung at a time, and every rung is a plan you read before it applies.
+
+The engineering view (components, sequence diagrams of the capture, derive, and read paths, the storage layout, concurrency, and the authority state machine) is in [docs/architecture.md](docs/architecture.md). Every record format is specified field by field in [specs/tellem.yml](specs/tellem.yml).
 
 ## Honest limits and status
 
@@ -422,7 +424,8 @@ A plain install stays at `observe`, with entries off and SpecStory untouched. A 
 
 ## Documentation
 
-- [Architecture, with the four figures](docs/architecture.md)
+- [Architecture: components, runtime paths, storage, and control plane](docs/architecture.md)
+- [Record formats specification](specs/tellem.yml)
 - [Operator runbook](docs/ops/tellem.md)
 - [Record formats](docs/reference/formats.md)
 - [Harness versions and payloads](docs/reference/harnesses.md)
