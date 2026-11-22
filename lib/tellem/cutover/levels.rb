@@ -4,6 +4,9 @@ require_relative "../authority/ledger"
 require_relative "../authority/state"
 require_relative "../authority/switch"
 require_relative "../errors"
+require_relative "../parity/report"
+require_relative "../reports/refresh"
+require_relative "../reports/scopes"
 
 module Tellem
   module Cutover
@@ -78,10 +81,30 @@ module Tellem
           refuse("authority_stopped", "the authority stop switch is set (#{stopped}); clear it with tellem authority resume before raising a level", next_command: "tellem authority resume")
         end
         required = required_readers(request, report)
-        return own!(request, report, required) if request["claude"] == "own"
+        if request["claude"] == "own"
+          own!(request, report, required)
+        else
+          switches!(report, REHEARSE_SWITCHES) if request["claude"] == "rehearse"
+          readers!(request, required)
+        end
+        gate!(request)
+      end
 
-        switches!(report, REHEARSE_SWITCHES) if request["claude"] == "rehearse"
-        readers!(request, required)
+      def gate!(request)
+        raised = raising(request)
+        return if raised.empty?
+
+        scopes = Reports::Scopes.resolve(all: true)
+        Reports::Refresh.run(scopes)
+        criteria = Tellem::Parity.run(scopes)["criteria"]
+        raised.each do |name|
+          group = criteria[name]
+          next if group["met"]
+
+          refuse("parity_unmet", "#{name} parity is #{group['passing']}/#{group['required']} of the last #{group['required']} shadowed sessions; " \
+                                 "#{request[name]} removes native transcripts, so it needs the full count",
+                 next_command: "tellem parity --all", detail: group)
+        end
       end
 
       def own!(request, report, required)

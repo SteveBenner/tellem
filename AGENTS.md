@@ -4,6 +4,9 @@ tellem is agent telemetry for Claude Code and Codex, built as a plugin on
 rplugin, the SDK for agent-harness plugins. This file tells an agent how to work
 on it. `CLAUDE.md` links to this file, so every harness reads the same text.
 
+Asked to install tellem from this repository's link? Follow
+[`INSTALL.md`](INSTALL.md) instead of this file.
+
 ## Where things are
 
 - `specs/tellem.app.yml` is the application contract: outcomes, scope, decisions

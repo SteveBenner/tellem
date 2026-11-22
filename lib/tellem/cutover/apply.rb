@@ -181,8 +181,8 @@ module Tellem
       return if criteria["met"]
       return if gate == "when_compared" && criteria["claude"]["considered"].zero? && criteria["codex"]["considered"].zero?
 
-      raise OperationalFailure.new("parity criteria are unmet (claude #{criteria['claude']['passing']}/#{criteria['claude']['considered']}, " \
-                                   "codex #{criteria['codex']['passing']}/#{criteria['codex']['considered']})",
+      shown = %w[claude codex].map { |name| criteria[name]["used"] ? "#{name} #{criteria[name]['passing']}/#{criteria[name]['required']}" : "#{name} nothing to compare" }
+      raise OperationalFailure.new("parity criteria are unmet (#{shown.join(', ')})",
                                    next_command: "tellem parity --all", detail: criteria.merge("cause" => "parity_unmet"))
     end
 

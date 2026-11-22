@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-22
+
+### Added
+
+- The README tells tellem's story: four Imagine scenes, what tellem does in
+  plain words, eight things you can ask your agent, each with the prompt and
+  the agent's real answer from a clean-home demo, an install that is one
+  sentence to your agent, and the command line at the end. It has a hero image
+  and four architecture figures.
+- `INSTALL.md`, written for an AI agent: check Ruby and git, get rplugin and
+  tellem without overwriting anything, install, run both doctors, and tell the
+  person what happens next. A fresh agent given only this file installed
+  tellem in a clean home.
+- `docs/architecture.md` walks through the pipeline, the life of one event,
+  a session's tree and places, and the takeover ladder.
+- `tellem tokens --by repository` shows a `repository_root` column, the
+  repository's path, beside each opaque repository id, in text and JSON.
+
+### Fixed
+
+- The cutover parity criteria were met by fewer sessions than FR-24 requires:
+  one passing Claude session of 20 printed "cutover criteria met". Each harness
+  now needs its full count (20 Claude, 5 Codex) once it has a shadowed session
+  with a reference, and a harness with nothing to compare does not block the
+  other. The summary says how many more are needed. `tellem cutover plan`
+  refuses `spool` or `own` for a harness whose own count is unmet
+  (`parity_unmet`, next `tellem parity --all`); `observe` and `rehearse`, which
+  remove nothing, are not gated.
+- Right after install, `tellem doctor` reported the missing `capture.enabled`
+  file as a finding, and an installing agent concluded that recording would
+  not work. The first SessionStart writes that file. Doctor now reports
+  "capture starts with the next agent session" while that first start is
+  pending, and keeps the finding when a first start ran and could not write it.
+- The agent skill says when a question needs `--all`. Asked "what did my agents
+  do today?" outside a repository, an agent answered from the current scope
+  alone and found only its own session.
+
 ## [0.5.5] - 2026-11-22
 
 ### Fixed

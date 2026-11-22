@@ -219,12 +219,13 @@ module Tellem
       groups = LAST.to_h do |harness, count|
         chosen = shadowed.select { |entry| entry["harness"] == harness }.first(count)
         passing = chosen.count { |entry| entry["verdict"] == PARITY }
-        [harness, { "required" => count, "considered" => chosen.size, "passing" => passing,
+        used = sessions.any? { |entry| entry["shadowed"] && entry["harness"] == harness && entry["verdict"] != NO_INCUMBENT }
+        [harness, { "required" => count, "considered" => chosen.size, "passing" => passing, "used" => used,
+                    "met" => !used || (chosen.size == count && passing == chosen.size),
                     "failing" => chosen.reject { |entry| entry["verdict"] == PARITY }.map { |entry| entry["session_key"] } }]
       end
-      considered = groups.values.sum { |group| group["considered"] }
       waiting = pending_sessions(sessions)
-      met = considered.positive? && waiting.empty? && groups.values.all? { |group| group["passing"] == group["considered"] }
+      met = waiting.empty? && groups.values.any? { |group| group["used"] } && groups.values.all? { |group| group["met"] }
       groups.merge("met" => met, "not_counted" => not_counted(sessions), "pending" => waiting)
     end
 
@@ -254,7 +255,10 @@ module Tellem
       criteria = report["criteria"]
       summary = LAST.keys.map do |harness|
         group = criteria[harness]
-        "#{harness} #{group['passing']}/#{group['considered']} of the last #{group['required']} with a reference (incumbent output, or the rollout for Codex)"
+        next "#{harness} has nothing to compare against here (no shadowed session with a reference), not required" unless group["used"]
+
+        needs = group["passing"] == group["required"] ? "" : "; needs #{group['required'] - group['passing']} more"
+        "#{harness} #{group['passing']}/#{group['required']} passing of the last #{group['required']} with a reference (incumbent output, or the rollout for Codex)#{needs}"
       end
       excluded = report["sessions"].sum { |entry| entry["tokens"].dig("excluded", "duplicate_ids").to_i }
       synthetic = report["sessions"].sum { |entry| entry["tokens"].dig("excluded", "synthetic_ids").to_i }

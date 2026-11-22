@@ -4,6 +4,7 @@ require_relative "../backends/reports"
 require_relative "../backends/rows"
 require_relative "../otel/report_details"
 require_relative "../record/kinds"
+require_relative "../record/reader"
 require_relative "mirror"
 require_relative "options"
 require_relative "records"
@@ -31,6 +32,36 @@ module Tellem
       end
 
       def run(scopes, params, workers: nil)
+        rows, source = collect(scopes, params, workers: workers)
+        [with_roots(rows, scopes, params), source]
+      end
+
+      def with_roots(rows, scopes, params)
+        return rows unless params["by"].include?("repository")
+
+        roots = repository_roots(scopes.reject { |item| item["gone"] })
+        rows.map do |row|
+          root = roots[row["repository"]]
+          row.to_a.flat_map { |key, value| key == "repository" ? [[key, value], ["repository_root", root]] : [[key, value]] }.to_h
+        end
+      end
+
+      def repository_roots(scopes)
+        roots = {}
+        scopes.each do |scope|
+          Records.derived_files(scope["root"]).each do |_key, path|
+            Record::Reader.each(path) do |record|
+              body = record["body"]
+              next unless record["kind"] == "repository" && body.is_a?(Hash) && body["repository_id"] && body["common_dir"]
+
+              roots[body["repository_id"]] ||= body["common_dir"].delete_suffix("/.git")
+            end
+          end
+        end
+        roots
+      end
+
+      def collect(scopes, params, workers: nil)
         live = scopes.reject { |item| item["gone"] }
         mirror = Mirror.current(live)
         if mirror
@@ -155,7 +186,7 @@ module Tellem
       end
 
       def text(rows, dims)
-        headers = dims + ["requests"] + COUNTERS
+        headers = dims.flat_map { |dim| dim == "repository" ? [dim, "repository_root"] : [dim] } + ["requests"] + COUNTERS
         table = rows.map { |row| headers.map { |name| row[name].nil? ? "-" : row[name].to_s } }
         Text.table(headers, table)
       end

@@ -40,7 +40,11 @@ next command.
 | Whole redacted entries of a session, for a plugin | `tellem export --session KEY [--after CURSOR] [--limit N]` (needs `transcripts.entries` on, off by default) |
 
 Add `--scope PATH` to ask about another repository and `--all` to ask across
-every registered scope. Read-only commands bring the scope up to date first.
+every registered scope. A question about the person's agents in general ("today",
+"this week", "my agents", "across my repos") that names no repository needs
+`--all`; without it the answer covers only the current directory's scope, which
+outside a repository holds little more than this session.
+Read-only commands bring the scope up to date first.
 Add `--no-derive` to skip that derive pass and answer from the record already
 derived, which is fast across many scopes; the envelope's `derive` then reads
 `{"status": "skipped"}`, and the answer can lag the newest activity. The hooks

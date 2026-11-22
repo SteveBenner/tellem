@@ -9,7 +9,7 @@
       "name": "tellem",
       "source": "./",
       "description": "Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files.",
-      "version": "0.5.5"
+      "version": "0.5.6"
     }
   ]
 }

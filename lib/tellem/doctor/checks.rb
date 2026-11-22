@@ -36,6 +36,8 @@ module Tellem
           Entry.finding("capture", "capture is disabled by TELLEM_DISABLED=1", "unset TELLEM_DISABLED", detail)
         elsif explained[:value] != true
           Entry.finding("capture", "capture is off (features.capture false, #{explained[:layer]} layer)", "tellem config set features.capture true", detail)
+        elsif !flag && !Record::FS.lexists?(Ports::HarnessPaths.capture_settled)
+          Entry.ok("capture", "capture starts with the next agent session: its first SessionStart writes #{Ports::HarnessPaths.capture_flag}", detail.merge("first_start" => "pending"))
         elsif !flag
           Entry.finding("capture", "features.capture is on but #{Ports::HarnessPaths.capture_flag} is missing", "tellem config set features.capture true", detail)
         elsif scope_off
