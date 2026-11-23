@@ -84,10 +84,10 @@ pointers, transcripts, views such as `TOKENS.jsonl`, `registry.jsonl`,
 `capture.enabled`, and cutover plans. They are append-only evidence, and a
 hand edit corrupts it silently. Change tellem only through its commands.
 
-A repository is public unless its scope declares `visibility private`. In a
-public repository tellem keeps `.tellem/` and `.specstory/history/` out of git
-with ignore files of their own; in a private one only volatile files stay
-ignored. tellem never runs `git add`, `git rm`, or `git commit`, and never
+A repository is private unless its scope declares `visibility public`. In a
+private repository only volatile files stay ignored, so `.tellem/` and
+`.specstory/history/` can be committed; in a public one tellem keeps both out
+of git with ignore files of their own. tellem never runs `git add`, `git rm`, or `git commit`, and never
 edits a repository's own `.gitignore` or `.git/info/exclude`.
 
 ## Ask the user first

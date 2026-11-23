@@ -1,6 +1,6 @@
 {
   "name": "tellem",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files.",
   "skills": "./skills/",
   "hooks": "./hooks/codex.json",

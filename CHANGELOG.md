@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `specs/tellem.app.yml` as committed in 0.5.8 did not parse as YAML: the D-9
+  amendment held a colon and space inside a plain scalar. It parses again, and
+  D-17 now states that its default was public in 0.4.1 to 0.5.7 and is private
+  from 0.5.8, instead of carrying both claims in one sentence.
+- `docs/adr/0006-self-ignoring-scopes.md`, ADR-6, the scope requirement, and
+  risk R-10 in `specs/tellem.impl.yml` still said a scope rests at `*`. They now
+  say `*` is the state a scope is created in, reconciled to its visibility, and
+  that a pointer scope in a repository tellem does not own is private by default
+  and shows as untracked there.
+
+## [0.5.8] - 2026-11-22
+
+### Changed
+
+- A repository's `visibility` now defaults to `private` (app D-37, reversing the
+  default of D-9 and D-17): a scope with no declaration, home or pointer, ignores
+  only the volatile files in `.tellem/.gitignore`, so `.tellem/` and
+  `.specstory/history/` can be committed. Declare `visibility public` in a
+  repository that may be published to keep `*`. Every existing undeclared scope
+  is reconciled to private on its next derive pass. The user scope keeps `*`,
+  and the hook still creates a new scope's `.gitignore` as `*` until the deriver
+  reconciles it. `tellem.rplugin.yml` (default), `specs/tellem.app.yml` (0.9.1),
+  `specs/tellem.yml`, `specs/tellem.impl.yml`, `docs/reference/formats.md`,
+  `docs/ops/tellem.md`, and `skills/tellem/SKILL.md` state the new default.
+
 ## [0.5.7] - 2026-11-22
 
 ### Added

@@ -55,13 +55,15 @@ below it, or a symlinked record file is refused with `Tellem::SymlinkRefused`.
 
 A repository's visibility is the `visibility` setting of its scope, `public` or
 `private`, declared in `.tellem/config.yml` and read through tellem's one
-config resolver. A repository with no declaration is public. tellem never asks
-a remote, a host API, or a credential (app D-17).
+config resolver. A repository with no declaration is private (app D-37, which
+reverses D-17's default). tellem never asks a remote, a host API, or a
+credential (app D-17).
 
-- Public: `.tellem/.gitignore` holds the single line `*`, so git ignores the
-  whole scope, the `.gitignore` included. Once `.specstory/history/` exists,
-  `.specstory/history/.gitignore` holds `*` too.
-- Private: `.tellem/.gitignore` lists only the volatile files, `derive.lock`,
+- Public, declared with `visibility public`: `.tellem/.gitignore` holds the
+  single line `*`, so git ignores the whole scope, the `.gitignore` included.
+  Once `.specstory/history/` exists, `.specstory/history/.gitignore` holds `*`
+  too.
+- Private, the default: `.tellem/.gitignore` lists only the volatile files, `derive.lock`,
   `derive.dirty`, `derive.cursor.json`, `mirror.sqlite3` with its `-wal`,
   `-shm`, and `-journal` files, and tellem's temporary `*.tmp` files, so the
   record, transcripts, views, and config may be committed. A
@@ -77,7 +79,7 @@ a remote, a host API, or a credential (app D-17).
 
 The hook never reads the setting: `Record::Scope.open` creates a new scope's
 `.gitignore` as `*`, so a new scope stays ignored until the deriver reconciles
-it. `Tellem::Record::Visibility.reconcile` runs in every derive pass for the
+it, which makes an undeclared scope private. `Tellem::Record::Visibility.reconcile` runs in every derive pass for the
 scope derived and every scope a pointer was written into, before the SpecStory
 writer's first copy, and at once on `tellem config set visibility`. It writes an
 ignore file only when its bytes differ, through a temporary file and a rename,

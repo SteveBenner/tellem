@@ -1,7 +1,7 @@
 schema: rplugin/v1
 id: tellem
 name: tellem
-version: 0.5.7
+version: 0.5.8
 rplugin: ">= 1.19.0"
 description: Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files.
 ports:
@@ -101,8 +101,8 @@ settings:
   - key: visibility
     type: enum
     options: [public, private]
-    default: public
-    description: Per-scope declaration of the repository's visibility, read from .tellem/config.yml and never looked up from a remote; public keeps .tellem and .specstory/history out of git, private ignores only volatile files (D-17).
+    default: private
+    description: Per-scope declaration of the repository's visibility, read from .tellem/config.yml and never looked up from a remote; private, the default, ignores only volatile files so the record may be committed, public keeps .tellem and .specstory/history out of git (D-17, D-37).
   - key: cutover.state
     type: enum
     options: [shadow, cutover]

@@ -32,13 +32,16 @@ finding names its next command.
 
 ### Repository visibility
 
-A repository is public unless its scope declares otherwise with
-`tellem config set visibility private --scope ROOT`. In a public repository
-`.tellem/` and `.specstory/history/` each carry a `.gitignore` of `*`, so
-nothing tellem writes can be pushed by accident. In a private repository only
-the volatile files (locks, the cursor, the dirty flag, the SQLite mirror and
-its sidecars, temporary files) stay ignored, and the operator may commit the
-rest. tellem never runs `git add`, `git rm`, or `git commit` and never edits
+A repository is private unless its scope declares otherwise with
+`tellem config set visibility public --scope ROOT`. In a private repository
+only the volatile files (locks, the cursor, the dirty flag, the SQLite mirror
+and its sidecars, temporary files) stay ignored, so `.tellem/` and
+`.specstory/history/` show in `git status` and the operator may commit the
+rest. Transcripts can carry sensitive content, so declare `visibility public`
+in any repository that may be published. In a public repository `.tellem/` and
+`.specstory/history/` each carry a `.gitignore` of `*`, so nothing tellem
+writes can be pushed by accident. A repository tellem only writes a pointer
+into is private by the same rule. tellem never runs `git add`, `git rm`, or `git commit` and never edits
 the repository's own `.gitignore` or `.git/info/exclude`. Setting the value
 reconciles the ignore files at once, and every derive keeps them in step.
 
@@ -46,7 +49,7 @@ reconciles the ignore files at once, and every derive keeps them in step.
 visibility` writes the scope named by `--scope`, else the repository around the
 working directory, and refuses with a usage error outside a repository. A
 user-level value is ignored, so no single setting can make every undeclared
-repository private, and `tellem doctor` names it.
+repository public, and `tellem doctor` names it.
 Turning a private repository public does not untrack what was committed;
 `tellem doctor` names each tracked path with the `git rm -r --cached`
 command, and the operator decides whether to run it.

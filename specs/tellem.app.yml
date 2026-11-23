@@ -1,6 +1,6 @@
 schema: tellem.application/v1
 name: tellem
-version: 0.9.0
+version: 0.9.1
 kind: rplugin
 status: conceptual
 recorded: '2026-10-21'
@@ -472,7 +472,7 @@ decisions:
     decision: Every .tellem/ directory, including transcripts, pointers, projections, and any SQLite mirror in it, is kept out of git by default.
     rationale: Transcripts can carry sensitive content, and the record must not leak through a push.
     alternatives: [commit history by default, commit only the ledger view]
-    revisit_when: The operator opts a repository into committed history. Amended by D-17 (0.4.1), which keeps this default for every repository not declared private.
+    revisit_when: The operator opts a repository into committed history. Amended by D-17 (0.4.1), which keeps this default for every repository not declared private, and by D-37 (0.5.8), which reverses it so that every repository not declared public is private.
   - id: D-10
     decision: Derivation runs in a detached process started at turn stop, subagent stop, and session end, before queries, and on explicit sync. There is no resident daemon.
     rationale: A daemon needs supervision, startup, and recovery of its own. Detached runs at natural boundaries keep the record current without one.
@@ -539,9 +539,10 @@ decisions:
   - id: D-17
     decision: >-
       A repository's visibility is declared in its scope's settings as
-      visibility public or private, and a repository with no declaration is
-      public. tellem never asks a remote, a host API, or a credential. In a
-      public repository every store tellem writes into the working tree is
+      visibility public or private. The default for a repository with no
+      declaration was public in 0.4.1 to 0.5.7 and is private from 0.5.8 (D-37).
+      tellem never asks a remote, a host API, or a credential. In a public
+      repository every store tellem writes into the working tree is
       ignored by git through a .gitignore of its own containing '*': the .tellem/
       scope and the SpecStory history copy. In a private repository tellem
       writes no such ignore file, so the operator may commit the record, the
@@ -554,7 +555,8 @@ decisions:
       content, so a repository that may be public must not leak them through a
       push, while a private repository may keep its agent history beside its
       code. A declaration is the only signal that needs no network and no
-      credential, and defaulting to public fails closed.
+      credential. Defaulting to public failed closed; D-37 reverses that
+      default.
     alternatives: [ask the remote host's API, infer visibility from the remote URL, ignore in every repository as D-9 first stated]
     revisit_when: A repository needs part of its record committed and part ignored, or tellem writes a store outside .tellem/ and .specstory/history.
 
@@ -1066,6 +1068,23 @@ decisions:
       prefixes, which is why allowances exist and why each must name its file.
     alternatives: [move the repository to the public host with its history restarted, keep tellem private, rewrite private wording at export time, leave the specification and docs out of the mirror]
     revisit_when: Development moves to the public repository, or a plugin ships tellem to its own users.
+  - id: D-37
+    decision: >-
+      A repository's visibility defaults to private. A scope with no visibility declaration,
+      in a home scope or a pointer scope alike, ignores only the volatile files, so
+      .tellem/ and .specstory/history/ can be committed; only a scope that declares
+      visibility public keeps '*'. Every existing scope with no declaration is reconciled to
+      private on its next derive pass. The user scope still always keeps '*', and the hook
+      still creates a new scope's .gitignore as '*' until the deriver reconciles it. This
+      reverses the default of D-9 and D-17; the declaration, the reconcile, and the rule that
+      tellem never runs git add, git rm, or git commit stand.
+    rationale: >-
+      The maintainer chose on 2026-11-22 that the record belongs in git by default, beside the
+      code it describes. The cost is that a repository that may be published must now declare
+      visibility public, because tellem still never asks a remote. scope.exclude_roots keeps
+      tellem from writing pointers into release checkouts.
+    alternatives: [flip only home scopes and keep pointer scopes ignored, flip only scopes created after the change, keep public as the default]
+    revisit_when: A transcript leak through a default-tracked scope is found, or tellem can learn a repository's visibility without a network call or a credential.
 
 metrics:
   status: Confirmed by the maintainer, 2026-10-21.

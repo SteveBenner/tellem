@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.7
+applies_to: tellem 0.5.8
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
@@ -1583,11 +1583,11 @@ planes:
       fields: []
       variants:
       - name: public
-        when: repository scope with no visibility setting, or visibility other than private, or the user
-          scope
+        when: repository scope whose scope-level setting visibility equals public, or the user scope
         content: "*\n"
       - name: private
-        when: repository scope whose scope-level setting visibility equals private
+        when: repository scope with no visibility setting or whose scope-level setting visibility equals
+          private (the manifest default is private since 0.5.8, app D-37)
         content: |
           derive.lock
           derive.dirty
@@ -5677,7 +5677,7 @@ planes:
         enum:
         - public
         - private
-        default: public
+        default: private
         description: Per-scope repository visibility; scope-only.
       - name: cutover.state
         type: string
