@@ -1,6 +1,6 @@
 schema: tellem.application/v1
 name: tellem
-version: 0.9.1
+version: 0.9.3
 kind: rplugin
 status: conceptual
 recorded: '2026-10-21'
@@ -1084,6 +1084,24 @@ decisions:
       visibility public, because tellem still never asks a remote. scope.exclude_roots keeps
       tellem from writing pointers into release checkouts.
     alternatives: [flip only home scopes and keep pointer scopes ignored, flip only scopes created after the change, keep public as the default]
+  - id: D-38
+    decision: >-
+      Parity of a Codex transcript sets aside the turns that tellem records and the incumbent
+      renders differently, and every other turn still has to match. Those turns are the
+      nested exec_command turns of code mode, user turns that carry injected context or
+      another agent's message, the inherited text turns before a forked subagent's first
+      task message, and the incumbent's echo of a request_user_input question. Each one is
+      listed as accepted, with its reason and a count. A context turn is set aside on both
+      sides, because the rollout reference keeps the injected messages and drops the
+      messages between agents. The comparison against the rollout uses the same rules.
+      Claude parity is unchanged.
+    rationale: >-
+      Measured 2026-11-22. Codex parity read 3 of the last 5. The 25 failing agents of
+      codex-01a1f348 and codex-01a1f10a differed only in these turns: tellem held more,
+      or held the same text inside a tool call. Rendering less would discard commands that
+      tellem captures from item_completed, so the comparison changes and the record does not.
+    alternatives: [stop rendering nested commands and context turns, accept the sessions one by one with --accept-parity, cut over Claude only]
+    revisit_when: SpecStory changes how it renders Codex code mode, forks, or questions, or tellem stops rendering one of these turns.
     revisit_when: A transcript leak through a default-tracked scope is found, or tellem can learn a repository's visibility without a network call or a credential.
 
 metrics:

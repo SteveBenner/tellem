@@ -30,6 +30,16 @@ module Tellem
       TELLEM_BEHIND = "tellem_behind"
       IMAGE_OMITTED = "[image omitted]"
       HANDBACK_TOOL = "SubagentHandback"
+      CODEX = "codex"
+      CODEX_NESTED_TOOL = "exec_command"
+      CODEX_QUESTION_TOOL = "request_user_input"
+      CODEX_CONTEXT = /\A(?:# AGENTS\.md instructions\b|<environment_context>|<user_instructions>|<hook_prompt\b|<codex_internal_context\b|Message Type: )/.freeze
+      CODEX_TASK = /\AMessage Type: /.freeze
+      CODEX_QUESTION_HEAD = 60
+      CODEX_NESTED = "codex_nested_command"
+      CODEX_CONTEXT_TURN = "codex_context_turn"
+      CODEX_INHERITED = "codex_inherited_turn"
+      CODEX_QUESTION_ECHO = "codex_question_echo"
 
       module_function
 
@@ -71,8 +81,10 @@ module Tellem
         tool = TOOL.match(body)
         text = tool ? nil : normalize(body)
         digest = text && Ids.sha256(text)[0, DIGEST_HEX]
+        question = tool && tool[1].start_with?(CODEX_QUESTION_TOOL) ? normalize(body) : nil
         { "role" => turn["role"], "digest" => digest, "tool" => tool && tool[1], "queued" => turn["queued"],
-          "sidechain" => turn["sidechain"], "thinking" => !text.nil? && thinking?(text), "text" => text, "body" => text && body }
+          "sidechain" => turn["sidechain"], "thinking" => !text.nil? && thinking?(text), "text" => text, "body" => text && body,
+          "question" => question }
       end
 
       def normalize(text)
@@ -87,7 +99,7 @@ module Tellem
         [turn["role"], turn["digest"], turn["tool"]]
       end
 
-      def compare(tellem_text, specstory_text, tools: true, subagent: false)
+      def compare(tellem_text, specstory_text, tools: true, subagent: false, harness: nil)
         queued, tellem = parse(tellem_text).partition { |turn| turn["queued"] }
         queued = queued.size
         incumbent = parse(specstory_text)
@@ -113,9 +125,58 @@ module Tellem
           return result.merge("verdict" => "match", "causes" => [], "accepted" => reasons.map { |reason, count| { "reason" => reason, "count" => count } })
         end
 
+        codex = harness == CODEX && codex_accepted(mine_turns, theirs_turns, subagent)
+        return result.merge("verdict" => "match", "causes" => [], "accepted" => codex.map { |reason, count| { "reason" => reason, "count" => count } }) if codex
+
         cause = difference(mine, theirs)
         cause = cause.merge("cause" => TELLEM_BEHIND) if reasons
         result.merge("verdict" => "mismatch", "causes" => [cause])
+      end
+
+      def codex_accepted(mine_turns, theirs_turns, subagent)
+        reasons = Hash.new(0)
+        task = subagent ? mine_turns.index { |turn| turn["role"] == "user" && CODEX_TASK.match?(turn["text"].to_s) } : nil
+        mine = mine_turns.each_with_index.reject do |turn, index|
+          reason = codex_extra(turn, task && index < task)
+          reasons[reason] += 1 if reason
+          reason
+        end.map(&:first)
+        questions = mine_turns.filter_map { |turn| turn["question"] }
+        digests = mine_turns.filter_map { |turn| turn["digest"] }
+        theirs = theirs_turns.each_with_index.reject do |turn, index|
+          reason = if context_turn?(turn) then CODEX_CONTEXT_TURN
+                   elsif index.positive? && question_echo?(turn, theirs_turns[index - 1], questions, digests) then CODEX_QUESTION_ECHO
+                   end
+          reasons[reason] += 1 if reason
+          reason
+        end.map(&:first)
+        return nil if reasons.empty? || mine.size != theirs.size
+
+        shared = shared_reasons(mine, theirs)
+        return nil unless shared
+
+        shared.each { |reason, count| reasons[reason] += count }
+        reasons
+      end
+
+      def codex_extra(turn, inherited)
+        return CODEX_NESTED if turn["tool"] == CODEX_NESTED_TOOL
+        return CODEX_CONTEXT_TURN if context_turn?(turn)
+        return CODEX_INHERITED if inherited && turn["tool"].nil?
+
+        nil
+      end
+
+      def context_turn?(turn)
+        turn["role"] == "user" && CODEX_CONTEXT.match?(turn["text"].to_s)
+      end
+
+      def question_echo?(turn, previous, questions, digests)
+        return false unless turn["role"] == "agent" && turn["tool"].nil? && turn["text"] && previous["tool"].to_s.start_with?(CODEX_QUESTION_TOOL)
+        return false if digests.include?(turn["digest"])
+
+        head = turn["text"][0, CODEX_QUESTION_HEAD]
+        questions.any? { |question| question.include?(head) }
       end
 
       def shared_reasons(mine, theirs)

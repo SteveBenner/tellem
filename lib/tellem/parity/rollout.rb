@@ -101,7 +101,7 @@ module Tellem
       def transcripts(tellem_text, reference)
         return { "verdict" => NO_REFERENCE, "causes" => [{ "cause" => "tellem_transcript_missing" }] } if tellem_text.nil?
 
-        result = Turns.compare(tellem_text, reference["markdown"], tools: false)
+        result = Turns.compare(tellem_text, reference["markdown"], tools: false, harness: "codex")
         relabel(result)
       end
 

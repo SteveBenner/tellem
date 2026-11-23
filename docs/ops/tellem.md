@@ -146,6 +146,25 @@ them:
   trailing turn, a second extra turn, and the same difference on the main
   thread stay mismatches.
 
+For Codex sessions only, and only after the rules above leave a mismatch,
+parity sets aside four kinds of turn that one side records and the other
+does not (D-38). The rest must still match turn for turn:
+
+- `codex_nested_command`: an `exec_command` turn. In code mode Codex runs each
+  shell command inside an `exec` tool call. tellem renders each command, and
+  SpecStory renders only the `exec` call.
+- `codex_context_turn`: a user turn that carries injected context, not a
+  prompt. These are AGENTS.md instructions, environment context, a hook prompt,
+  Codex internal context, or a `Message Type:` message from another agent.
+  Such a turn is set aside on both sides. The comparison against the Codex
+  rollout applies the same rules, because the rollout keeps the injected
+  messages and drops the messages between agents.
+- `codex_inherited_turn`: in a subagent, a text turn before the first
+  `Message Type:` message. That is history a forked child inherited, and
+  SpecStory renders only its tool calls.
+- `codex_question_echo`: an incumbent agent turn that repeats a
+  `request_user_input` question tellem holds in the tool call's input.
+
 Parity compares a session's tellem rows with the incumbent ledgers the
 incumbent wrote to, not only the scope root's `TOKENS.jsonl`. The incumbent
 writes a row to the ledger of the repository its cwd is in: the nearest ancestor

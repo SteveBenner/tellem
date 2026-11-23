@@ -183,7 +183,7 @@ module Tellem
       incumbent = history.read(theirs)
       return base.merge("verdict" => MISMATCH, "causes" => [{ "cause" => "transcript_unreadable" }]) if ours.nil? || incumbent.nil?
 
-      base.merge(Turns.compare(ours, incumbent, subagent: agent != Ids::MAIN_AGENT))
+      base.merge(Turns.compare(ours, incumbent, subagent: agent != Ids::MAIN_AGENT, harness: key.split("-", 2).first))
     end
 
     def tellem_names(root, key)

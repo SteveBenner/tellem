@@ -1,6 +1,6 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "tellem",
-  "version": "0.5.9",
+  "version": "0.5.11",
   "description": "Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files."
 }

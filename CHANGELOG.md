@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-11-22
+
+### Fixed
+
+- Installed, 0.5.10 read Codex 4 of the last 5. `codex-01a1f348` still failed
+  its comparison against the Codex rollout: 408 tellem turns to 385, because
+  the rollout keeps the injected user messages and drops messages between
+  agents. A `codex_context_turn` is now set aside on both sides, and
+  `Parity::Rollout.transcripts` applies the Codex rules (app D-38). The
+  SpecStory comparisons are unchanged.
+
+## [0.5.10] - 2026-11-22
+
+### Fixed
+
+- `tellem parity` failed Codex sessions in which tellem holds more than
+  SpecStory. Codex read 3 of the last 5, so the SpecStory cutover stayed blocked.
+  For Codex only, `Parity::Turns.compare` now sets aside four kinds of turn,
+  each listed as accepted with a count (app D-38), and every other turn must
+  still match:
+  - `codex_nested_command`: code-mode `exec_command` turns.
+  - `codex_context_turn`: user turns that carry AGENTS.md, environment, hook,
+    internal, or inter-agent context.
+  - `codex_inherited_turn`: the inherited text turns of a forked subagent.
+  - `codex_question_echo`: SpecStory's echo of a `request_user_input`
+    question.
+
+  Over every compared pair, the 25 failing Codex agents now match and no
+  Claude verdict changes.
+
 ## [0.5.9] - 2026-11-22
 
 ### Fixed

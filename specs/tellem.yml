@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.9
+applies_to: tellem 0.5.11
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
