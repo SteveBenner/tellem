@@ -13,8 +13,16 @@ module Tellem
         return true if list.nil?
         return false if list.empty?
 
+        list.any? { |root| under?(path, root) }
+      end
+
+      def covering(path)
+        Array(roots).find { |root| under?(path, root) }
+      end
+
+      def under?(path, root)
         text = path.to_s
-        list.any? { |root| text == root || text.start_with?(root.end_with?("/") ? root : "#{root}/") }
+        text == root || text.start_with?(root.end_with?("/") ? root : "#{root}/")
       end
 
       def roots

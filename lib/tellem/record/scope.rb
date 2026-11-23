@@ -15,18 +15,23 @@ module Tellem
       module_function
 
       def locate(cwd)
-        start = real_existing(cwd.to_s.empty? ? "/" : cwd)
-        dir = start
+        root = repository_above(cwd)
+        return user_root unless root
+
+        Exclude.covers?(root) ? user_root : root
+      end
+
+      def repository_above(cwd)
+        dir = real_existing(cwd.to_s.empty? ? "/" : cwd)
         loop do
           root = repository_root(dir)
-          return (Exclude.covers?(root) ? user_root : root) if root
+          return root if root
 
           parent = File.dirname(dir)
-          break if parent == dir
+          return nil if parent == dir
 
           dir = parent
         end
-        user_root
       end
 
       def user_root

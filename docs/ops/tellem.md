@@ -47,8 +47,10 @@ reconciles the ignore files at once, and every derive keeps them in step.
 
 `visibility` is read and written per repository scope only. `tellem config set
 visibility` writes the scope named by `--scope`, else the repository around the
-working directory, and refuses with a usage error outside a repository. A
-user-level value is ignored, so no single setting can make every undeclared
+working directory, and refuses with a usage error outside a repository. For a
+repository under a `scope.exclude_roots` root it sets nothing, names the
+excluded root, and exits 0: tellem writes no scope there, and the user scope
+keeps `*`. A user-level value is ignored, so no single setting can make every undeclared
 repository public, and `tellem doctor` names it.
 Turning a private repository public does not untrack what was committed;
 `tellem doctor` names each tracked path with the `git rm -r --cached`

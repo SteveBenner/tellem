@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-11-22
+
 ### Fixed
+
+- `tellem config set visibility VALUE --scope ROOT`, or run inside ROOT, for a
+  repository under a `scope.exclude_roots` root refused with "visibility is
+  declared per repository scope only; a user-level value is ignored", though the
+  operator had named a repository. It now names the excluded root, says tellem
+  writes no scope there and the user scope keeps `*`, sets nothing, and exits 0;
+  `--json` reports layer `excluded` with `excluded_root`.
+  `Record::Scope.repository_above` and `Record::Exclude.covering` give the
+  repository and the root, and `Scope.locate` resolves exactly as before.
 
 - `specs/tellem.app.yml` as committed in 0.5.8 did not parse as YAML: the D-9
   amendment held a colon and space inside a plain scalar. It parses again, and

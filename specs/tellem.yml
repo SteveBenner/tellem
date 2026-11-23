@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.8
+applies_to: tellem 0.5.9
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
@@ -7079,7 +7079,8 @@ doc_drift:
     values failing their type are ignored; scope.exclude_roots mirrored by Config.set, unset, sync_capture_flag
   code: >-
     a failing scope value falls through to the next layer; setting visibility is scope-only and scope.exclude_roots
-    is user-only (refused with a scope); cutover-only keys (authority.*, cutover.state, retention.native,
+    is user-only (refused with a scope); config set of a scope-only key for a repository under an excluded root
+    sets nothing and reports layer excluded with excluded_root, exit 0 (since 0.5.9); cutover-only keys (authority.*, cutover.state, retention.native,
     otel.receiver, retention.purge) are refused by config set; none of this is in the page
   where: lib/tellem/config/resolver.rb:19
   plane: control

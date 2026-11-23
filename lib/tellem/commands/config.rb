@@ -27,10 +27,25 @@ module Tellem
         when "get" then show(Tellem::Config.explain(rest[0], scope: effective), effective)
         when "set"
           Tellem::Config.refuse_cutover_only!(rest[0], rest[1])
-          target = Tellem::Config.scope_only?(rest[0].to_s) ? explicit || effective : explicit
+          excluded = excluded_repository(rest[0].to_s, options[:scope] || Dir.pwd)
+          return excluded if excluded
+
+          target =Tellem::Config.scope_only?(rest[0].to_s) ? explicit || effective : explicit
           reconciled(show(Tellem::Config.set(rest[0], rest[1], scope: target), target), effective)
         when "list" then listing(Tellem::Config.list(scope: effective), effective)
         end
+      end
+
+      def excluded_repository(key, path)
+        return nil unless Tellem::Config.scope_only?(key)
+
+        repository = Record::Scope.repository_above(File.expand_path(path))
+        return nil unless repository && Record::Exclude.covers?(repository)
+
+        root = Record::Exclude.covering(repository)
+        under = root ? "the excluded root #{root}" : "scope.exclude_roots, which cannot be read, so every repository counts as excluded"
+        data = { "key" => key, "value" => nil, "layer" => "excluded", "scope" => repository, "excluded_root" => root }
+        { data: data, text: "#{repository} is under #{under}; tellem writes no scope there, so #{key} is not set and the user scope keeps *" }
       end
 
       def reconciled(result, scope)
