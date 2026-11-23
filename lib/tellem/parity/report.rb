@@ -28,12 +28,13 @@ module Tellem
     module_function
 
     def run(scopes, session: nil, since: nil)
-      sessions = scopes.reject { |scope| scope["gone"] }.flat_map { |scope| scope_sessions(scope["root"], session, since) }
+      retired = LAST.keys.to_h { |harness| [harness, Ledger.retired_at(harness)] }
+      sessions = scopes.reject { |scope| scope["gone"] }.flat_map { |scope| scope_sessions(scope["root"], session, since, retired) }
       sessions.sort_by! { |entry| [entry["last_at"].to_s, entry["session_key"]] }.reverse!
       { "sessions" => sessions, "criteria" => criteria(sessions) }
     end
 
-    def scope_sessions(root, filter, since)
+    def scope_sessions(root, filter, since, retired = {})
       keys = Record::Scope.session_keys(root).select { |key| wanted?(key, filter) }
       return [] if keys.empty?
 
@@ -46,7 +47,7 @@ module Tellem
         last_at = last_at(root, key)
         next if since && last_at.to_s < since
 
-        entry(root, key, last_at, [history, known], [ledger, duplicates], view).tap do |item|
+        entry(root, key, last_at, [history, known], [ledger, duplicates, retired], view).tap do |item|
           item["tokens"]["problem"] = ledger_problem if ledger_problem
           item["transcripts"]["problem"] = history.problem if history.problem
         end
@@ -60,12 +61,14 @@ module Tellem
     end
 
     def entry(root, key, last_at, specstory, incumbent, view)
-      ledger, duplicates = incumbent
+      ledger, duplicates, retired = incumbent
       history, known = specstory
       harness, session_id = key.split("-", 2)
+      cutoff = (retired || {})[harness]
       transcripts = behind(transcripts(root, key, session_id, history, known), root, key, last_at)
       mine = view[session_id] || []
-      tokens = pending(tokens(mine, ledger[session_id] || [], duplicates), [mine, ledger[session_id] || [], duplicates], root, key, last_at)
+      theirs = ledger[session_id] || []
+      tokens = pending(tokens(mine, theirs, duplicates, cutoff), [mine, theirs, duplicates, cutoff], root, key, last_at)
       rollout = harness == "codex" ? rollout(root, key, last_at, mine) : nil
       parts = [transcripts["verdict"], tokens["verdict"]]
       parts.concat([rollout.dig("transcripts", "verdict"), rollout.dig("tokens", "verdict")]) if rollout
@@ -97,7 +100,7 @@ module Tellem
     def pending(tokens, rows, root, key, last_at)
       return tokens unless tokens["verdict"] == MISMATCH
 
-      mine, theirs, duplicates = rows
+      mine, theirs, duplicates, cutoff = rows
       only = tokens["causes"].find { |cause| cause["cause"] == "tellem_only_rows" }
       return tokens unless only
       return tokens if ended?(root, key) || stale?(last_at)
@@ -108,7 +111,7 @@ module Tellem
       return tokens unless extra.size == only["count"] &&
                            extra.all? { |row| row["timestamp"].to_s >= newest_logged[row["agent_id"].to_s].to_s }
 
-      trial = Ledger.compare(mine - extra, theirs, duplicates)
+      trial = Ledger.compare(mine - extra, theirs, duplicates, cutoff)
       return tokens unless trial["verdict"] == "match"
 
       newest = extra.max_by { |row| [row["timestamp"].to_s, row["id"].to_s] }
@@ -151,10 +154,10 @@ module Tellem
       false
     end
 
-    def tokens(mine, theirs, duplicates)
+    def tokens(mine, theirs, duplicates, cutoff = nil)
       return { "verdict" => NO_INCUMBENT, "rows" => { "tellem" => mine.size, "ledger" => 0 }, "causes" => [] } if theirs.empty?
 
-      Ledger.compare(mine, theirs, duplicates)
+      Ledger.compare(mine, theirs, duplicates, cutoff)
     end
 
     def transcripts(root, key, session_id, history, known)
@@ -220,7 +223,9 @@ module Tellem
         chosen = shadowed.select { |entry| entry["harness"] == harness }.first(count)
         passing = chosen.count { |entry| entry["verdict"] == PARITY }
         used = sessions.any? { |entry| entry["shadowed"] && entry["harness"] == harness && entry["verdict"] != NO_INCUMBENT }
-        [harness, { "required" => count, "considered" => chosen.size, "passing" => passing, "used" => used,
+        newest_failing = chosen.index { |entry| entry["verdict"] != PARITY }
+        needs = newest_failing ? count - newest_failing : count - chosen.size
+        [harness, { "required" => count, "considered" => chosen.size, "passing" => passing, "used" => used, "needs" => needs,
                     "met" => !used || (chosen.size == count && passing == chosen.size),
                     "failing" => chosen.reject { |entry| entry["verdict"] == PARITY }.map { |entry| entry["session_key"] } }]
       end
@@ -257,7 +262,7 @@ module Tellem
         group = criteria[harness]
         next "#{harness} has nothing to compare against here (no shadowed session with a reference), not required" unless group["used"]
 
-        needs = group["passing"] == group["required"] ? "" : "; needs #{group['required'] - group['passing']} more"
+        needs = group["needs"].to_i.positive? ? "; needs #{group['needs']} more passing sessions" : ""
         "#{harness} #{group['passing']}/#{group['required']} passing of the last #{group['required']} with a reference (incumbent output, or the rollout for Codex)#{needs}"
       end
       excluded = report["sessions"].sum { |entry| entry["tokens"].dig("excluded", "duplicate_ids").to_i }

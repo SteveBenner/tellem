@@ -36,7 +36,7 @@ module Tellem
       def read(path, session_id:, agent_key:, from: nil)
         batch = Batch.new(harness: HARNESS, session_id: session_id, agent_key: agent_key)
         state = { version: nil, model: nil, service_tier: nil, turn_id: nil, prev_total: nil, charged: 0, fallback: [],
-                  records: {}, order: [], approval: nil, approvals: {}, session: nil, cwd: nil, turn_cwd: nil, cwds: {} }
+                  records: {}, order: [], approval: nil, approvals: {}, session: nil, cwd: nil, turn_cwd: nil, cwds: {}, meta: false }
         cursor = Record::Reader.each(path, from: from) { |entry| entry(batch, state, entry) }
         batch.usage = state[:order].empty? ? state[:fallback] : state[:order].map { |key| state[:records][key] }
         batch.add_gap("torn_line", detail: { "lines" => cursor["torn"] }, count: cursor["torn"]) if cursor["torn"].positive?
@@ -108,6 +108,9 @@ module Tellem
       end
 
       def session_meta(batch, state, payload)
+        return if state[:meta]
+
+        state[:meta] = true
         state[:version] = payload["cli_version"] if payload["cli_version"].is_a?(String)
         state[:session] = string(payload["session_id"]) || string(payload["id"]) || state[:session]
         state[:cwd] = string(payload["cwd"]) || state[:cwd]

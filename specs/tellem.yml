@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.11
+applies_to: tellem 0.5.15
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
@@ -3141,7 +3141,9 @@ planes:
       - >-
         Thread ids come from session_meta payload id or session_id; the parent from payload.parent_thread_id
         or payload.source.subagent.thread_spawn.parent_thread_id; the agent role from payload.agent_role,
-        thread_spawn.agent_role, or source.subagent.other.
+        thread_spawn.agent_role, or source.subagent.other. Only the first session_meta of a rollout counts:
+        a child thread's rollout replays its root's session_meta as forked history, and that line changes
+        none of the thread id, parent, role, session, cwd, cli version, or start time.
       - >-
         Agents.link by parent_thread_id happens only when no spawn-site link exists: evidence parent_thread_id,
         tool_use_id null, call null, hence agent.spawn_tool_use_id null.

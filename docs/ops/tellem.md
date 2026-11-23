@@ -115,6 +115,12 @@ These are excluded and counted instead of compared:
 - Rows that exist only in tellem and whose cwd is not an existing directory
   (`incumbent_cwd_missing`): the incumbent's hook cannot open `TOKENS.jsonl`
   there and exits silently. They are removed from both sides' sums.
+- Rows that exist only in tellem and are timestamped at or after an applied
+  cutover that retired the incumbent's `TOKENS.jsonl` hook for that harness
+  (`incumbent_retired`, counted under `excluded.retired_ids` and listed under
+  `accepted`): the incumbent stopped writing then, so a session running
+  across the cutover has nothing to compare them with (D-40). They are
+  removed from both sides' sums.
 
 These differences are accepted and listed under `accepted` with a count and a
 sample, so a session with only these is at parity and the report still shows
@@ -145,6 +151,11 @@ them:
   `SubagentHandback` tool turn. SpecStory leaves the final report out. Any other
   trailing turn, a second extra turn, and the same difference on the main
   thread stay mismatches.
+- `incumbent_renders_queued`: the incumbent writes queued messages as ordinary
+  user turns, as SpecStory does since its re-sync of 2026-11-22. Parity first
+  compares with tellem's queued turns set aside. If that fails, it compares
+  again with them kept in place, and a match then counts the queued turns
+  here (D-39). The other rules apply to both comparisons.
 
 For Codex sessions only, and only after the rules above leave a mismatch,
 parity sets aside four kinds of turn that one side records and the other
@@ -201,7 +212,9 @@ causes (billing, permission mode, or cwd from a replay without credentials,
 payload fields, or worktrees) are not excluded.
 
 Parity holds when the last 20 shadowed Claude sessions that have incumbent
-output and the last 5 shadowed Codex sessions all match (FR-24). A Codex
+output and the last 5 shadowed Codex sessions all match (FR-24). While they do
+not, the report says how many more passing sessions it needs: enough to push
+the newest failing session out of the window, or to fill it. A Codex
 session is judged against its rollout (below), because Codex has no incumbent
 writer. Cutover
 is not offered before that. A shadowed session is one with raw hook records.

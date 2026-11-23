@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require "json"
 require_relative "../errors"
 require_relative "../record/fs"
 require_relative "../record/reader"
 require_relative "../projections/tokens"
+require_relative "../ports/harness_paths"
 
 module Tellem
   module Parity
@@ -23,9 +25,35 @@ module Tellem
       MODE_CHANGED = "mode_changed_mid_session"
       BILLING_UNDETECTED = "incumbent_billing_undetected"
       CWD_MISSING = "incumbent_cwd_missing"
+      RETIRED = "incumbent_retired"
+      TOKENS_CAPTURE = "tokens_ledger"
+      APPLIED = "applied"
       ZERO_COUNTERS = (COUNTERS | Projections::Tokens::INTEGER_FIELDS).freeze
 
       module_function
+
+      def retired_at(harness)
+        root = Ports::HarnessPaths.cutover_dir
+        Dir.children(root).filter_map { |name| retirement(File.join(root, name), harness) }.min
+      rescue SystemCallError
+        nil
+      end
+
+      def retirement(dir, harness)
+        state = JSON.parse(Record::FS.read(File.join(dir, "state.json")))
+        return nil unless state.is_a?(Hash) && state["direction"] == APPLIED && state["at"].is_a?(String)
+
+        plan = JSON.parse(Record::FS.read(File.join(dir, "plan.json")))
+        return nil unless plan.is_a?(Hash)
+
+        hooks = Array(plan["hooks"]).select { |hook| hook.is_a?(Hash) && Array(hook["captures"]).include?(TOKENS_CAPTURE) }.map { |hook| hook["name"] }
+        retired = Array(plan["registrations"]).any? do |entry|
+          entry.is_a?(Hash) && hooks.include?(entry["hook"]) && entry["file"].to_s.split("/").first == harness
+        end
+        retired ? state["at"] : nil
+      rescue SystemCallError, SymlinkRefused, JSON::ParserError
+        nil
+      end
 
       def path(root)
         File.join(root, FILE)
@@ -106,13 +134,14 @@ module Tellem
         File.identical?(one, other)
       end
 
-      def compare(tellem_rows, ledger_rows, duplicates = {})
+      def compare(tellem_rows, ledger_rows, duplicates = {}, retired = nil)
         mine = unique(tellem_rows)
         theirs = unique(ledger_rows)
         excluded = (mine.keys | theirs.keys).select { |id| duplicates.key?(id) }
         synthetic = theirs.keys.select { |id| !duplicates.key?(id) && synthetic?(theirs[id]) }
         unwritable = (mine.keys - theirs.keys).select { |id| missing_directory?(mine[id]["cwd"]) }
-        (excluded + synthetic + unwritable).each do |id|
+        after = retired ? (mine.keys - theirs.keys - unwritable).select { |id| mine[id]["timestamp"].to_s >= retired } : []
+        (excluded + synthetic + unwritable + after).each do |id|
           mine.delete(id)
           theirs.delete(id)
         end
@@ -121,6 +150,7 @@ module Tellem
         only(causes, "tellem_only_rows", mine.keys - theirs.keys)
         field_causes, accepted = fields(mine, theirs)
         causes.concat(field_causes)
+        accepted.unshift(accepted_rows(RETIRED, after)) unless after.empty?
         accepted.unshift(accepted_rows(CWD_MISSING, unwritable)) unless unwritable.empty?
         sums = sums(mine.values, theirs.values)
         sums.each do |counter, pair|
@@ -130,7 +160,7 @@ module Tellem
         end
         { "verdict" => causes.empty? ? "match" : "mismatch", "rows" => { "tellem" => mine.size, "ledger" => theirs.size },
           "excluded" => { "duplicate_ids" => excluded.size, "ledger_rows" => ledger_rows.count { |row| excluded.include?(row["id"]) },
-                          "synthetic_ids" => synthetic.size, "unwritable_cwd_ids" => unwritable.size },
+                          "synthetic_ids" => synthetic.size, "unwritable_cwd_ids" => unwritable.size, "retired_ids" => after.size },
           "sums" => sums, "causes" => causes, "accepted" => accepted }
       end
 

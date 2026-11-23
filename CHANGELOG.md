@@ -7,11 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-11-23
+
+### Added
+
+- `skills/tellem-migrate/SKILL.md`, an agent skill that walks a user from
+  SpecStory to tellem with the commands tellem already has: status and
+  discovery, parity, a backup of `~/.claude/projects`, `~/.codex/sessions`, and
+  the repositories' `.specstory/history`, `tellem cutover plan` and apply,
+  and the retention check. It runs read-only commands and dry-run plans, asks
+  before every `--confirm` and every copy of the user's data, and ends at a
+  takeover with SpecStory kept (app D-41). It registers in
+  `tellem.rplugin.yml` and in the generated `.claude-plugin/plugin.json`.
+- README section "Moving from SpecStory to tellem", which names the skill and
+  the steps it takes.
+
+### Changed
+
+- The README's limits line no longer says no takeover step has run on a real
+  machine: the cutover and native retention were applied on the maintainer's
+  machine on 2026-11-23, with SpecStory kept.
+
+## [0.5.14] - 2026-11-23
+
+### Fixed
+
+- Claude parity read 19 of the last 20 because `claude-S18` was running
+  when the cutover (applied 07:36:26Z) removed `token-logger.sh`
+  from Claude's hooks. Its ledger ends at 07:33:19Z, so the 112 rows tellem
+  captured after 07:39Z counted as `tellem_only_rows`. `Parity::Ledger.compare`
+  now takes the applied time of a cutover that retired the `TOKENS.jsonl` hook
+  for the session's harness. A tellem-only row at or after that time counts
+  under `excluded.retired_ids` and is accepted as `incumbent_retired` (app
+  D-40). Read only, over the host's sessions, that session alone moves to
+  parity (100 rows on each side), and every other verdict and accepted count
+  is unchanged.
+- The criteria line said "needs 1 more" for a window with one failure, whatever
+  its position. It now reports how many new passing sessions push the newest
+  failing session out of the window, or fill it, as `needs` in `--json` and
+  "needs N more passing sessions" in the text. A failure second of 20 needs 19.
+
+## [0.5.13] - 2026-11-23
+
+### Fixed
+
+- After the cutover, Claude parity fell from 20 of the last 20 to 8. Between
+  23:48 and 23:51 PST on 2026-11-22, SpecStory re-synced its history, and its
+  renderer now writes queued messages as ordinary user turns. Parity set
+  tellem's queued turns aside, so every session with queued messages failed:
+  SpecStory held exactly the queued count more turns, with the same text at
+  the same positions. `Parity::Turns.compare` now compares a second time with
+  the queued turns kept in place when the first comparison fails, and
+  accepts a match there as `incumbent_renders_queued` (app D-39). In process,
+  over 1480 transcript pairs, 95 agents move from mismatch to match (376
+  queued turns accepted), none moves the other way, and every other accepted
+  count is unchanged.
+
+## [0.5.12] - 2026-11-22
+
+### Fixed
+
+- Installed, 0.5.11 read Codex 4 of the last 5. `codex-S16` was 4 usage
+  rows short of the incumbent ledger (157566 tokens). The rows sat in guardian
+  reviews spawned by worker threads. A Codex 0.171 worker's rollout replays its
+  root's `session_meta` as its second line, and `Ingest::Codex.session_meta`
+  let that line overwrite the worker's thread id, parent, role, and start
+  time. `Sources.codex_descendants` then looked for the root's children
+  instead of the worker's. Only the first `session_meta` of a rollout counts
+  now. In process, the four affected workers each find their guardian, and the
+  missing rows close every counter difference exactly.
+
 ## [0.5.11] - 2026-11-22
 
 ### Fixed
 
-- Installed, 0.5.10 read Codex 4 of the last 5. `codex-01a1f348` still failed
+- Installed, 0.5.10 read Codex 4 of the last 5. `codex-S16` still failed
   its comparison against the Codex rollout: 408 tellem turns to 385, because
   the rollout keeps the injected user messages and drops messages between
   agents. A `codex_context_turn` is now set aside on both sides, and
@@ -229,7 +299,7 @@ the MIT License (application spec D-36). Nothing is published yet.
     (`token: ""`) stayed a mismatch.
   - A line ending `</tool-use>` inside a fenced code block no longer closes the
     tool block in `lib/tellem/parity/turns.rb`. A tool output quoting a SpecStory
-    transcript had split three main threads (b3712d8f, a0b28599, dbf9be87) into
+    transcript had split three main threads (S20, S21, S15) into
     hundreds of shifted turns.
   - New accepted differences: `incumbent_truncated` (SpecStory stopped writing a
     resumed subagent's file, 12 agents) and `image_placeholder` (tellem keeps
@@ -266,7 +336,7 @@ the MIT License (application spec D-36). Nothing is published yet.
   by digest within 600 s. Measured on copies of six real sessions: 195 records
   (64 spawn, 1 handback, 36 send, 94 receive; 63 background launches give no
   handback), and the 2026-11-06 send from
-  323b441a to a socket address joined to session 49a50b65's receive 1.1 s later,
+  S13 to a socket address joined to session S14's receive 1.1 s later,
   758 bytes and one digest on both sides. `tellem tree` shows `msgs S/R` per agent.
 - Per-agent time in `tellem tree` and `tellem state` (D-34): wall, active,
   waiting on the user (main), and spawn to stop (subagents), computed at report
@@ -314,7 +384,7 @@ the MIT License (application spec D-36). Nothing is published yet.
 ### Fixed
 
 - The assignment redaction replaced prose between two code spans with
-  `[REDACTED:assignment]` (application spec D-31). Symptom: session 5265df67's
+  `[REDACTED:assignment]` (application spec D-31). Symptom: session S11's
   transcript holds `` `x-api-key:`[REDACTED:assignment]`--access-token` `` where the
   session said `` `x-api-key:` - converting a curl from an API key is a header
   change, not a key swap). Always pass `--access-token` ``, about 96 characters
@@ -330,7 +400,7 @@ the MIT License (application spec D-36). Nothing is published yet.
   unique strings from the 60 most recent native sessions, 8 outputs differ, all
   this pattern. Cost: a secret written after a closed name span and a space,
   then followed by a code span with no space, is no longer redacted by this
-  rule. Records already written keep their text, so 5265df67 still mismatches;
+  rule. Records already written keep their text, so S11 still mismatches;
   sessions captured from now on keep the prose.
 
 ## [0.3.2] - 2026-11-06
@@ -339,7 +409,7 @@ the MIT License (application spec D-36). Nothing is published yet.
 
 - `tellem parity` read only the scope root's `TOKENS.jsonl`, so a session whose
   requests ran in other repositories read as tellem-only rows (application spec
-  D-30). Symptom: session bb33c2a5 showed 647 tellem rows against 644 ledger
+  D-30). Symptom: session S12 showed 647 tellem rows against 644 ledger
   rows, with three requests whose cwd was a nested Codex scratch repository.
   Cause: the incumbent token logger writes each row to the ledger of the
   repository its cwd is in, and parity never read those ledgers. Now
@@ -350,7 +420,7 @@ the MIT License (application spec D-36). Nothing is published yet.
   rows from each other ledger it names, at most 64. A ledger that cannot be read
   adds nothing, so those rows stay tellem-only. Nothing is accepted. Measured:
   the port and the incumbent's function gave identical targets on 12 paths,
-  bb33c2a5 moves from mismatch to parity, and no session that matched before
+  S12 moves from mismatch to parity, and no session that matched before
   mismatches after.
 
 ## [0.3.1] - 2026-11-06
@@ -363,14 +433,14 @@ clear.
 ### Fixed
 
 - `tellem parity` counted heading-shaped lines printed by a tool as turns.
-  Symptom: session e817b5ae, a development session of tellem itself, read 439
+  Symptom: session S8, a development session of tellem itself, read 439
   tellem turns against 448 in SpecStory, with phantom turns such as
   `hello ${slug}` and a chunk of Ruby under a User heading. Cause:
   `Parity::Turns.parse` matched the heading pattern on every line, including
   lines inside a tool-use block, so tool output that contained transcript text
   split into extra turns on the SpecStory side. Now a tool-use block, opened by
   a line beginning `<tool-use data-tool-` and closed by a line ending
-  `</tool-use>`, starts no turn. Measured: e817b5ae moves from mismatch to
+  `</tool-use>`, starts no turn. Measured: S8 moves from mismatch to
   parity, with `redaction_only` accepted on three turns, and no session that
   matched before mismatches after.
 ### Added
@@ -384,14 +454,14 @@ clear.
   count of 1. A different trailing turn, a second extra turn, and the same
   difference on the main thread stay mismatches
   (`Parity::Turns.compare(..., subagent:)`, passed by `Parity::Report`).
-  Measured: 8405ee55 moves from mismatch to parity; 10294a2a and 5265df67 lose
+  Measured: S9 moves from mismatch to parity; S10 and S11 lose
   their subagent mismatch.
 
 ### Not fixed
 
-- 10294a2a and 5265df67 still differ on the main thread, where tellem's
+- S10 and S11 still differ on the main thread, where tellem's
   `[REDACTED:assignment]` stands for more characters than parity accepts or for
-  none. 7a88fa41 and bb33c2a5 differ on tokens. Sessions still being written moved
+  none. S4 and S12 differ on tokens. Sessions still being written moved
   between the two measuring runs and are not counted either way.
 
 ## [0.3.0] - 2026-11-05

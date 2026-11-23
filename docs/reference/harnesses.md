@@ -12,7 +12,7 @@ harness version (FR-26, risk R-1). Update this page when that happens.
 | --- | --- | --- |
 | Claude Code | 2.1.308 | Real sessions of waves 1 to 3: capture, subagent_stop, async hooks, post_tool_failure, OpenTelemetry, retention |
 | Claude Code | 2.1.312 | slice_4_integration: isolated native install, `tellem doctor` |
-| Codex CLI | 0.163 | Real Codex rollouts of wave 2 (sessions 01a1505c, 01a15bf2, 01a14ed9) against the incumbent ledger |
+| Codex CLI | 0.163 | Real Codex rollouts of wave 2 (sessions S22, S23, S24) against the incumbent ledger |
 | Codex CLI | 0.165.0 | slice_4_integration: isolated native install; the hook run below |
 | rplugin | 1.19.3 | Packaging, check, install, doctor (tellem needs 1.19.0 or newer) |
 | rplugin extension catalogue | 2.9.0 | Hook rendering for Claude Code and Codex |
@@ -81,7 +81,7 @@ tellem's package. With it, `codex app-server` `hooks/list` reports tellem's six
 hooks with source `plugin`.
 
 The keys were observed on Codex 0.165.0 in one
-`codex exec --dangerously-bypass-hook-trust` run (session 01a184a2,
+`codex exec --dangerously-bypass-hook-trust` run (session S2,
 2026-10-28), in a scratch repository, against a scratch `CODEX_HOME` whose only
 hooks are tellem's. Every one of its nine hook events had the required keys
 (`shape` `known`, no missing keys):

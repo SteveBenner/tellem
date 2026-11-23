@@ -1,6 +1,6 @@
 schema: tellem.application/v1
 name: tellem
-version: 0.9.3
+version: 0.9.6
 kind: rplugin
 status: conceptual
 recorded: '2026-10-21'
@@ -865,9 +865,9 @@ decisions:
       Measured 2026-11-06 over the host's Claude sessions. Parity read a heading-shaped line
       printed by a tool as a new turn, so any session that printed transcript text, such as
       tellem's own development sessions, failed on turns that exist on neither side (session
-      e817b5ae, 10 such turns). SpecStory also omits the subagent's final report that tellem
+      S8, 10 such turns). SpecStory also omits the subagent's final report that tellem
       renders, so every subagent session failed on a turn tellem holds and the incumbent
-      lacks (sessions 10294a2a, 5265df67, 8405ee55). Both read as mismatches that no cutover
+      lacks (sessions S10, S11, S9). Both read as mismatches that no cutover
       could clear, and neither is a loss of capture.
     alternatives: [accept any turn-count excess on a subagent, accept every difference in a session that printed transcript text, leave the criteria and count these sessions as failures]
     revisit_when: SpecStory renders the subagent's final report, or a harness shows a tool turn that is not delimited by a tool-use block.
@@ -882,7 +882,7 @@ decisions:
       ledger that cannot be read adds nothing, so its rows stay tellem-only and the session
       stays a mismatch. No difference is accepted.
     rationale: >-
-      Measured 2026-11-06. Session bb33c2a5 ran requests with its cwd in two nested Codex
+      Measured 2026-11-06. Session S12 ran requests with its cwd in two nested Codex
       scratch repositories. The incumbent wrote those three rows to the nested repositories'
       ledgers, parity read only the scope root's ledger, and the session read as three
       tellem-only rows. Any session that works across repositories fails the same way,
@@ -1035,7 +1035,7 @@ decisions:
     rationale: >-
       Measured 2026-11-18 on the 20 sessions that failed parity: redaction marker spans
       over 64 characters or of zero length (a quoted empty value), tool output quoting a
-      SpecStory transcript in three sessions (b3712d8f, a0b28599, dbf9be87), SpecStory
+      SpecStory transcript in three sessions (S20, S21, S15), SpecStory
       files that stopped growing after a subagent was resumed (12 agents), and image
       placeholders (2) made every transcript mismatch; none was a capture defect. tellem's
       redactor applied to the incumbent's turn explained every tellem-side redaction
@@ -1097,12 +1097,61 @@ decisions:
       Claude parity is unchanged.
     rationale: >-
       Measured 2026-11-22. Codex parity read 3 of the last 5. The 25 failing agents of
-      codex-01a1f348 and codex-01a1f10a differed only in these turns: tellem held more,
+      codex-S16 and codex-S17 differed only in these turns: tellem held more,
       or held the same text inside a tool call. Rendering less would discard commands that
       tellem captures from item_completed, so the comparison changes and the record does not.
     alternatives: [stop rendering nested commands and context turns, accept the sessions one by one with --accept-parity, cut over Claude only]
     revisit_when: SpecStory changes how it renders Codex code mode, forks, or questions, or tellem stops rendering one of these turns.
     revisit_when: A transcript leak through a default-tracked scope is found, or tellem can learn a repository's visibility without a network call or a credential.
+  - id: D-39
+    decision: >-
+      Parity compares a transcript with tellem's queued user turns set aside, as before. When
+      that leaves a mismatch and tellem has queued turns, it compares again with them kept in
+      place, and a match then counts as incumbent_renders_queued with the number of queued
+      turns. Every other rule applies unchanged to both comparisons, so a session matches
+      whether or not the incumbent renders queued messages.
+    rationale: >-
+      Measured 2026-11-23. After the cutover, SpecStory rewrote about 1260 history files between
+      23:48 and 23:51 PST on 2026-11-22, and its renderer now writes queued messages as ordinary
+      user turns. Claude parity fell from 20 of 20 to 8 of 20. In each of the 11 closed failing
+      sessions, SpecStory's extra turns were exactly tellem's queued turns, with the same text
+      at the same positions. The cutover plan that subsumes SpecStory needs parity met while
+      its wrappers remain.
+    alternatives: [stop setting queued turns aside, accept the sessions one by one, re-render SpecStory history from an older version]
+    revisit_when: SpecStory renders queued messages differently again, or tellem stops rendering queued turns.
+  - id: D-40
+    decision: >-
+      A cutover that is applied and retires the incumbent's TOKENS.jsonl hook for a harness ends that
+      ledger as a reference at the cutover's applied time. A tellem row of that harness that is not in
+      the ledger and is timestamped at or after that time counts as incumbent_retired: it is removed
+      from both sides' sums, counted under excluded.retired_ids, and listed under accepted. Rows before
+      that time, and ledger-only rows, are compared as before. The criteria report how many more
+      passing sessions the window needs: the window size less the position of the newest failing
+      session, or the empty slots when none fails.
+    rationale: >-
+      Measured 2026-11-23. The cutover, applied at 07:36:26Z, removed token-logger.sh from
+      Claude's Stop, SubagentStop, and SessionEnd hooks while claude-S18 was running. Its ledger
+      rows end at 07:33:19Z, and the 112 rows only tellem had run from 07:39:27Z to 08:13:21Z, so
+      Claude parity read 19 of 20 on a session tellem captured correctly. The report said "needs 1
+      more" with that session second in the window, where 19 new passing sessions would be needed.
+    alternatives: [accept the session with --accept-parity, wait for 19 newer sessions, judge only sessions that ended before the cutover]
+    revisit_when: A cutover retires the ledger for Codex, a rollback restores the hook, or the incumbent writes TOKENS.jsonl from another path.
+  - id: D-41
+    decision: >-
+      tellem ships a second agent skill, tellem-migrate, that walks a user from SpecStory to tellem
+      with the existing commands: discover, parity, a backup of native transcripts and SpecStory
+      history, cutover plan and apply, and retention. It runs only read-only commands and dry-run
+      plans, asks before every --confirm and every copy of the user's data, and ends at a takeover
+      with SpecStory kept. SpecStory removal and the levels above observe are named as follow-ups
+      the user must ask for. The skill adds no command and no behaviour, and the README points at it.
+    rationale: >-
+      The takeover is a sequence of gated steps whose order and hazards live in the operator runbook.
+      On 2026-11-23 the first real cutover turned on native retention while nothing had backed up the
+      native transcripts, and the next derive removed three verified sessions. A skill that puts the
+      backup before the plan, and says that a plan made from an open agent session counts it as pending,
+      keeps that order for the next user.
+    alternatives: [a section in the tellem skill, a new tellem command that runs the sequence, the runbook alone]
+    revisit_when: The cutover sequence or its gates change, or tellem backs up native transcripts itself.
 
 metrics:
   status: Confirmed by the maintainer, 2026-10-21.

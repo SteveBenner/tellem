@@ -22,6 +22,7 @@
 - [How it works](#how-it-works)
 - [Honest limits and status](#honest-limits-and-status)
 - [Command reference](#command-reference)
+- [Moving from SpecStory to tellem](#moving-from-specstory-to-tellem)
 - [Taking over from SpecStory and native transcripts](#taking-over-from-specstory-and-native-transcripts)
 - [Documentation](#documentation)
 - [License](#license)
@@ -371,7 +372,6 @@ The engineering view (components, sequence diagrams of the capture, derive, and 
 - **Tokens are what the provider reported.** tellem never estimates. A request the provider reported nothing for shows as a gap, not a guess.
 - **Recording starts with the next session** after install. Earlier sessions can be imported from the agent app's own transcripts with `tellem import`.
 - **Codex needs one extra step.** Codex asks you to trust a plugin's hooks before they run, and until you do, Codex sessions aren't recorded. Codex can't go past `spool` on the takeover ladder.
-- **Takeover is proven only in test homes.** Import, cutover, retention, levels above `observe`, and SpecStory removal are built and verified in containers and isolated homes. None has been applied on a real machine yet. The maintainer's own machine has run tellem in shadow mode since 2026-11-06.
 
 [FEATURES.md](FEATURES.md) lists what is verified, how, and what was not run. The version is in [VERSION](VERSION).
 
@@ -401,7 +401,26 @@ tellem doctor                    # what is wrong and the next command
 - **Tasks.** With `tasks.mode` on (the default), tellem groups your prompts into tasks with the `tasks.*` settings. It is telemetry only: no hook, marker reply, or status line.
 - **Settings.** `tellem config list` shows every setting and where its value comes from. `tellem config set KEY VALUE [--scope PATH]` changes one.
 
-The operator runbook is [docs/ops/tellem.md](docs/ops/tellem.md), and the agent skill is [skills/tellem/SKILL.md](skills/tellem/SKILL.md).
+The operator runbook is [docs/ops/tellem.md](docs/ops/tellem.md), the agent skill is [skills/tellem/SKILL.md](skills/tellem/SKILL.md), and the migration skill is [skills/tellem-migrate/SKILL.md](skills/tellem-migrate/SKILL.md).
+
+## Moving from SpecStory to tellem
+
+tellem ships a second agent skill, [`tellem-migrate`](skills/tellem-migrate/SKILL.md), that walks you through the move. Install tellem first (see [Install with one sentence](#install-with-one-sentence)), let it run beside SpecStory for a while, then say this to Claude Code or Codex:
+
+> Use tellem to migrate me from SpecStory. Use the tellem-migrate skill.
+
+Your agent then works through these steps with you:
+
+1. **Where things stand.** It runs `tellem doctor`, `tellem transcripts discover`, and the cutover and SpecStory status commands, all read-only.
+2. **Parity.** It reads `tellem parity --all` and tells you whether tellem has captured the last 20 Claude sessions (and 5 Codex sessions) as completely as SpecStory and the token ledger did.
+3. **Backup.** Before anything can delete a native transcript, it asks where to copy `~/.claude/projects`, `~/.codex/sessions`, and your repositories' `.specstory/history` folders, and checks the copy with a checksum run.
+4. **Plan.** It runs `tellem cutover plan`, a dry run, and shows you the plan id, the hooks it would retire, and the retention window.
+5. **Apply, with your yes.** It never runs `tellem cutover apply --confirm` without asking you first, and it suggests you run the plan and apply from a terminal with no agent session open, because an open session counts as pending parity.
+6. **Check.** It confirms `cutover.state`, `retention.native`, `tellem doctor`, and `tellem retention`, and tells you how to roll back.
+
+After the cutover, retention removes the native Claude transcripts of verified sessions that have been idle longer than `retention.native_days` (14 by default), including sessions from before the cutover. tellem keeps its own redacted Markdown copy, not the native files, so the backup in step 3 is worth taking.
+
+The guide stops there: SpecStory stays installed and its history stays on disk. Removing SpecStory and the higher levels (`spool`, `rehearse`, `own`) are separate steps your agent takes only if you ask. The details are in the [operator runbook](docs/ops/tellem.md#cutover).
 
 ## Taking over from SpecStory and native transcripts
 

@@ -28,6 +28,7 @@ module Tellem
       IMAGE_PLACEHOLDER = "image_placeholder"
       INCUMBENT_TRUNCATED = "incumbent_truncated"
       TELLEM_BEHIND = "tellem_behind"
+      QUEUED_RENDERED = "incumbent_renders_queued"
       IMAGE_OMITTED = "[image omitted]"
       HANDBACK_TOOL = "SubagentHandback"
       CODEX = "codex"
@@ -100,9 +101,19 @@ module Tellem
       end
 
       def compare(tellem_text, specstory_text, tools: true, subagent: false, harness: nil)
-        queued, tellem = parse(tellem_text).partition { |turn| turn["queued"] }
-        queued = queued.size
+        parsed = parse(tellem_text)
         incumbent = parse(specstory_text)
+        queued = parsed.count { |turn| turn["queued"] }
+        result = judge(parsed.reject { |turn| turn["queued"] }, incumbent, queued, tools, subagent, harness)
+        return result if result["verdict"] == "match" || queued.zero?
+
+        rendered = judge(parsed, incumbent, queued, tools, subagent, harness)
+        return result unless rendered["verdict"] == "match"
+
+        rendered.merge("accepted" => Array(rendered["accepted"]) + [{ "reason" => QUEUED_RENDERED, "count" => queued }])
+      end
+
+      def judge(tellem, incumbent, queued, tools, subagent, harness)
         unless tools
           tellem = tellem.reject { |turn| turn["tool"] }
           incumbent = incumbent.reject { |turn| turn["tool"] }

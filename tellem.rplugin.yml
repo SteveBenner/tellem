@@ -1,7 +1,7 @@
 schema: rplugin/v1
 id: tellem
 name: tellem
-version: 0.5.11
+version: 0.5.15
 rplugin: ">= 1.19.0"
 description: Flight recorder for coding agents - agent tree, places, provider-reported tokens, persona evidence, state, and transcripts in scoped files.
 ports:
@@ -27,6 +27,7 @@ native: true
 contents:
   skills:
     - { id: tellem, path: skills/tellem/SKILL.md }
+    - { id: tellem-migrate, path: skills/tellem-migrate/SKILL.md }
   agents: []
   specs:
     - { path: specs/tellem.app.yml }
