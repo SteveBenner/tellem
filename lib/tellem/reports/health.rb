@@ -124,6 +124,27 @@ module Tellem
           "by_cause" => totals.keys.sort.map { |cause| { "cause" => cause, "count" => totals[cause] } } }
       end
 
+      def hook_gap_hours(since:, before:)
+        totals = Hash.new(0)
+        undated = 0
+        Records.each_line_record(Ports::HarnessPaths.hook_gaps) do |record|
+          at = moment(record["ts"])
+          if at.nil?
+            undated += 1
+          elsif at >= since && at < before
+            totals[[(at.to_i - since.to_i) / 3600, record["cause"].to_s]] += 1
+          end
+        end
+        rows = totals.keys.sort.map { |hour, cause| { "hour" => hour, "cause" => cause, "count" => totals[[hour, cause]] } }
+        { "rows" => rows, "undated" => undated }
+      end
+
+      def moment(ts)
+        ts.is_a?(String) ? Time.iso8601(ts) : nil
+      rescue ArgumentError
+        nil
+      end
+
       def text(report)
         lines = report["scopes"].flat_map do |scope|
           next ["#{scope['root']}: gone"] unless scope["health"]

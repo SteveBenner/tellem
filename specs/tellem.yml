@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.15
+applies_to: tellem 0.5.16
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
@@ -6658,6 +6658,117 @@ planes:
         description: The specstory_writer setting pinned at the end of the removal.
       invariants:
       - Written once per completed removal; the receipts in removal.jsonl are the record of each step.
+    - id: tellem.dashboard/v1
+      name: dashboard dataset and page
+      file: "<state_dir>/dashboard/dashboard.html and dashboard-share.html; with --json, data of the report envelope and no file"
+      root: data
+      encoding: >-
+        One self-contained HTML document, atomic replace, mode 0600, directory 0700, never through a
+        symlink. The dataset is JSON in a script element of type application/json with every less-than
+        sign and the line and paragraph separators escaped, under a content security policy that allows
+        no connection.
+      written_by:
+      - lib/tellem/dashboard/writer.rb
+      - lib/tellem/dashboard/page.rb
+      - lib/tellem/dashboard/dataset.rb
+      read_by:
+      - lib/tellem/dashboard/web/
+      command: tellem dashboard [--share] [--no-open] [--json]
+      fields:
+      - name: "schema"
+        type: string
+        required: true
+        description: >-
+          tellem.dashboard/v1.
+      - name: "tellem_version"
+        type: string
+        required: true
+        description: >-
+          The tellem version that wrote the document.
+      - name: "as_of"
+        type: string
+        required: true
+        description: >-
+          UTC time the document describes; records at or after it are excluded.
+      - name: "since"
+        type: string
+        required: true
+        description: >-
+          UTC hour 719 hours before the hour that holds as_of; hour 0 of every hour index.
+      - name: "hours"
+        type: integer
+        required: true
+        description: >-
+          720.
+      - name: "share"
+        type: boolean
+        required: true
+        description: >-
+          True for the share copy, where label, home, and repository path are null and repositories are named repository N in repos order.
+      - name: "counters"
+        type: array
+        required: true
+        description: >-
+          Counter names in the order usage rows carry them.
+      - name: "dict"
+        type: object
+        required: true
+        description: >-
+          Sorted string lists models, agent_types, efforts, personas, tools, harnesses, and causes; rows refer to them by index, null when unknown.
+      - name: "repos"
+        type: array
+        required: true
+        description: >-
+          One object per live covered scope: name, path, lag_seconds (null when no raw record in the window was read), last_derive_at, newest_raw_at, dirty, torn_raw, torn_derived, and status ok, lagging (over 900 s, or never derived with raw records), or unreadable (every figure null).
+      - name: "gone_repos"
+        type: integer
+        required: true
+        description: >-
+          Covered scopes that no longer exist.
+      - name: "sessions"
+        type: array
+        required: true
+        description: >-
+          Sessions with a derived record in the window, ordered by repository index then key: key, repo, harness, label, started, ended, first, last, open (the main agent's open flag), home, active_hours (inclusive hour ranges holding any record), agents, calls, failures. Instants are epoch seconds. A session key present in two scopes appears twice.
+      - name: "sessions[].agents"
+        type: array
+        required: true
+        description: >-
+          Depth-first, roots first, siblings by start then key: key, parent (index or null), type, model, effort, isolation, started, ended, open, wall, active (the spans definition when time.active is both), waiting, spans ([from, to] pairs).
+      - name: "sessions[].calls"
+        type: array
+        required: true
+        description: >-
+          [agent, tool, calls, failed, total_ms, timed_calls] over answered tool calls in the window; total_ms null when none was timed.
+      - name: "sessions[].failures"
+        type: array
+        required: true
+        description: >-
+          [at, agent, tool, duration_ms] for every failed tool call in the window, newest first. Successful calls are not listed one by one.
+      - name: "usage"
+        type: array
+        required: true
+        description: >-
+          [hour, session, agent, agent_type, model, effort, persona, requests, one value per counter, cost_usd, costed_requests], one row per distinct first seven fields over the requests tellem tokens counts. A counter or cost no request reported is null. Persona is the persona key, with unknown as null.
+      - name: "gaps"
+        type: array
+        required: true
+        description: >-
+          [hour, repo, cause, harness, count] from gap records in the window.
+      - name: "hooks"
+        type: object
+        required: true
+        description: >-
+          Keys 24h, 7d, and 30d, each [repo, harness, event, count, p50, p99, max] from raw hook_ms; repo null covers all, harness and event null is that repo's overall row. Rows exist only with samples.
+      - name: "hook_gaps"
+        type: array
+        required: true
+        description: >-
+          [hour, cause, count] from the host's hook gap file for records in the window; its path is not included.
+      invariants:
+      - Reading starts no deriver, queries no mirror, opens no connection, and changes no scope file.
+      - For the same since and a past until, request and counter sums equal tellem tokens.
+      - Each run replaces its own file; the file is a disposable report, never a source of record.
 unresolved:
 - plane: capture
   question: >-

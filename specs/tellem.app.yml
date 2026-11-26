@@ -1,6 +1,6 @@
 schema: tellem.application/v1
 name: tellem
-version: 0.9.6
+version: 0.10.0
 kind: rplugin
 status: conceptual
 recorded: '2026-10-21'
@@ -43,6 +43,7 @@ outcomes:
   - { id: O-10, evidence: 'For each harness the operator can move transcript authority between observe, spool, and own, as far as that harness allows, through one reviewed plan with a rollback, and every report keeps working at every level. A level the harness cannot honor is refused with the reason.' }
   - { id: O-11, evidence: 'tellem installs and works on a host with no SpecStory, no ~/.ai, no polispec, and no rStack, and is then the capturer of record with no cutover. On a host with SpecStory the operator can coexist with it, subsume it reversibly, or remove it, and with remove SpecStory stays gone and its readers keep their files.' }
   - { id: O-13, evidence: 'For any session, tellem lists every message between its agents and to or from other sessions, with sender, recipient, channel, time, size, and a redacted head, joins a cross-session message to the receiving session when its scope is covered, and shows each agent''s wall, active, waiting, and spawn-to-stop time in tree and state (D-33, D-34).' }
+  - { id: O-14, evidence: 'One command shows, without writing into any repository, what agents did, what they spent, and what capture missed, with token numbers equal to tellem tokens for the same period (D-42).' }
   - { id: O-12, evidence: 'tellem runs beside another plugin without disturbing it, and a plugin that ships tellem can run it on a Ruby of its own (D-26). A plugin that reads native transcripts is named before any plan takes them away. A coresident plugin can read complete structured entries from tellem and apply its own policy to them.' }
 
 scope:
@@ -61,6 +62,7 @@ scope:
     - An out-of-hook deriver that turns raw observations into places, state, transcripts, pointers, projections, and backend mirrors.
     - Optional SQLite and PostgreSQL mirrors, set up by provisioning code that ships with tellem.
     - CLI reports, configuration, provisioning, rebuild, and prune.
+    - A read-only dashboard file over the covered scopes (D-42).
     - SpecStory compatibility, shadow, parity, cutover, and migration.
     - Transcript method discovery across harness stores, expiry settings, switches, hooks, shell wrappers, watchers, repository outputs, OpenTelemetry exporters, and readers (D-21).
     - Transcript authority per harness, observe, spool, or own, from one reviewed plan with rollback, including purge of verified native transcripts (D-22, D-23, D-24).
@@ -78,7 +80,7 @@ scope:
     - A bundled database, database file, or database driver. Drivers are optional and installed only through provisioning.
     - Retrieval-vendor profiles and MCP wrapping.
     - Policy enforcement and Polispec feature constraints.
-    - A dashboard in this release. It is recorded in ROADMAP.md.
+    - A dashboard server, and tasks, places, messages, and transcript reading in the dashboard, in this release. They are recorded in ROADMAP.md.
     - Aggregation across hosts. A PostgreSQL mirror is the expected path; it is recorded in ROADMAP.md.
     - Automatic deletion of tellem's own record.
     - Hidden reasoning, provider internals, or any state a harness does not expose.
@@ -207,6 +209,7 @@ domain:
     - Nothing in tellem's record is deleted except by an operator-confirmed prune. Files tellem does not own (native transcripts, SpecStory's program state and history) are deleted only under a plan the operator confirmed, only after the record is verified to hold what they held, and each deletion leaves a receipt with its sha256. A body spool file tellem has ingested is removed without a receipt, because it is a buffer.
     - A session that ends with neither a native transcript nor a body spool leaves a capture_lost gap, and the first such gap returns that harness to its previous level for later sessions. At the own level this detection comes after the fact, so the session that reveals the loss cannot be recovered; a plan for own states that cost.
     - A plan never takes native transcripts away from a discovered reader the operator has not named as accepted.
+    - A dashboard file is a disposable report outside every scope. It is never a source of record, and writing it changes no scope (D-42).
 
 journeys:
   - id: J-1
@@ -318,6 +321,15 @@ journeys:
       names, and writes entries. The plugin reads entries from a cursor, applies its
       own bounds, and sends what it chooses, and it can delete tellem's copy of what it
       was responsible for. tellem sends nothing anywhere itself.
+  - id: J-14
+    name: Dashboard
+    flow: >-
+      The operator runs tellem dashboard. tellem reads the derived records of every
+      covered scope without running the deriver, writes one HTML file in its state
+      directory, and opens it. The page opens on the sessions of the last 24 hours.
+      Opening a session shows its agents, their timeline, and their tool calls.
+      Spend and health are separate pages. With --share tellem writes a second copy
+      without prompt text or paths.
 
 quality_scenarios:
   - id: Q-1
@@ -391,6 +403,13 @@ quality_scenarios:
       A transcript policy extension that raises, hangs, or returns the wrong shape
       withholds by failing closed: the affected session's entries wait, a gap records
       why, and capture continues.
+  - id: Q-12
+    concern: Dashboard scale and privacy
+    scenario: >-
+      With 30 days holding 1,200 sessions and 1.2 million records, tellem dashboard
+      finishes within 30 s and writes a file under 15 MB that a current browser opens
+      and filters without a visible stall. The share file holds no prompt text and no
+      path from the record, and neither run changes a scope file.
 
 trust_boundaries:
   - Hook payloads are trusted as harness-originated only through the installed hook transport. Fields a caller supplies elsewhere are evidence, never authority.
@@ -403,6 +422,7 @@ trust_boundaries:
   - A repository a session touched receives at most a pointer, and an unwritable repository yields a gap, never an error to the agent.
   - The only network destination is a configured database backend. No hook opens a connection, and the database client carries a rate limiter, bounded jittered retries, timeouts, and a kill switch.
   - The optional OTLP receiver binds 127.0.0.1 only and accepts a request only with its bearer token. Its events are evidence that enriches a usage observation already derived from a native transcript; they never create usage or change a counter.
+  - The dashboard page loads nothing from outside its own file, carries a content security policy that allows no connection, and receives record strings only as data it sets as text. Its files are readable only by the operator's account (D-42).
   - Backend credentials live only in the SDK secrets port.
   - Persona evidence is evidence. A name is not authentication.
   - tellem reads host state only through the plugin SDK and declared ports, and has no rStack wire. A persona binding lives in an extension with an rStack-free default of unknown.
@@ -1152,6 +1172,36 @@ decisions:
       keeps that order for the next user.
     alternatives: [a section in the tellem skill, a new tellem command that runs the sequence, the runbook alone]
     revisit_when: The cutover sequence or its gates change, or tellem backs up native transcripts itself.
+  - id: D-42
+    decision: >-
+      tellem dashboard writes one self-contained HTML file in tellem's state directory,
+      readable only by the operator, from the record of every covered scope, and opens
+      it in a browser when run in a terminal; --no-open turns that off. It reads files
+      only: it starts no deriver, queries no mirror, opens no connection, and writes
+      nothing into a scope. It embeds the last 30 days and opens on the last 24 hours.
+      The windows are 24 hours, 7 days, and 30 days; each ends at the as-of time and
+      starts on an hour, and the first two compare with the window of equal length
+      before them. The pages are Sessions, one session's agent tree, agent timeline,
+      and tool calls, Spend, and Health. Tool calls are embedded as counts, errors, and
+      durations per agent and tool, with every failed call listed; successful calls are
+      not listed one by one. Token numbers are the provider-reported counters, counted
+      once per request as tellem tokens counts them. Cost appears only where
+      OpenTelemetry recorded it, with the number of requests it covers. Repository
+      means the session's home scope. A second file, written by --share, holds no prompt
+      text and no path and numbers repositories. Each run replaces its own file. --json
+      prints the same data in the report envelope and writes no file. On first open the
+      theme follows the operating system, among five bundled themes behind one switcher.
+    rationale: >-
+      The maintainer asked on 2026-11-25 for a minimal dashboard projected from
+      tellem's record, and chose a file now with a local server later, a read that never
+      writes into a repository, full detail by default with a share copy, and tool
+      summaries with every failure after the measurement: 30 days on the reference host
+      held 1,183 sessions, 1.16 million records, and 235,939 tool calls, and listing the
+      tool calls through tellem spans took 43 s and 1.4 GB and stopped at 20,000 rows.
+      This departs from J-4 and D-10 for this one verb: it runs no deriver, so the page
+      can lag the record, and it states its as-of time and each scope's derivation lag.
+    alternatives: [a local server first, run the deriver before each file, embed every tool call, read a database mirror, keep one file per run]
+    revisit_when: A dashboard server is built, which amends the single listener rule of the exclusions and D-16, or the file exceeds the bounds of Q-12.
 
 metrics:
   status: Confirmed by the maintainer, 2026-10-21.
@@ -1236,7 +1286,7 @@ downstream_specifications:
     acceptance: A parity report over shadowed sessions, a dry-run cutover plan, a reversible applied cutover in an isolated home, and an import that leaves every source file unchanged.
   - id: IS-11
     purpose: Packaging and records.
-    decides: The rplugin manifest, SDK hook surfaces per harness, install and doctor checks, FEATURES.md with honest status, and ROADMAP.md for the dashboard, other harnesses, and cross-host aggregation.
+    decides: The rplugin manifest, SDK hook surfaces per harness, install and doctor checks, FEATURES.md with honest status, and ROADMAP.md for the dashboard server and its later views, other harnesses, and cross-host aggregation.
     depends_on: [IS-2, IS-9]
     acceptance: SDK check and doctor report zero findings in an isolated home, and FEATURES.md separates built, verified, and deployed.
   - id: IS-12
@@ -1259,6 +1309,14 @@ downstream_specifications:
     decides: The Ruby floor, the transcript policy port, entries, export, sync by session, and the private install path.
     depends_on: [IS-5, IS-9]
     acceptance: tellem runs identically on Ruby 3.3 and 4.0 and refuses visibly below 3.3, a policy withholds what it names before the record, a failing policy fails closed, and export round-trips a session with parts and reasoning.
+  - id: IS-16
+    purpose: The dashboard.
+    decides: >-
+      The single read pass and its worker bounds, the embedded data format, the share
+      copy's removals, the page, its themes and components, and how the file is
+      written.
+    depends_on: [IS-3, IS-5, IS-9]
+    acceptance: Over a real record, token totals equal tellem tokens for the same bounds, no scope file changes, the share file holds no prompt head or path, a label holding markup renders as text, Q-12 holds, the rendered page passes an accessibility and layout audit in all five themes, and output is the same on Ruby 3.3 and 4.0.
 
 carried_forward:
   bounds: { record_bytes: 8388608, nesting_depth: 64, tool_payload_bytes: 262144 }

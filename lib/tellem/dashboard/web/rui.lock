@@ -1,0 +1,53 @@
+schema: rui.lock/v1
+rui_version: "1.9.6"
+modules:
+  - id: "composite.card.stat-row"
+    version: "0.1.0"
+    target: vanilla
+    digest: 5fa847ed74d99b87de57ce9a5f9be2078e08884304ea8156019b6326c44d01c1
+    added_at: "2026-11-26T02:16:31Z"
+  - id: "composite.chart.time-series"
+    version: "0.2.1"
+    target: vanilla
+    digest: 602a47b10fce771580644d6e4ca9ec304f15725b0e1b27f1e5ada5e78302933d
+    added_at: "2026-11-26T02:16:36Z"
+  - id: "composite.data.ranked-list"
+    version: "0.1.1"
+    target: vanilla
+    digest: 83196b01953c735f648f60bcb815f8ac56e032e1202b8c6e7a9cd4f360bced5e
+    added_at: "2026-11-26T02:16:37Z"
+  - id: "composite.data.table"
+    version: "0.2.2"
+    target: vanilla
+    digest: 59e79acf838f7470853bd7be38ca7c6021d373a348c886b173393db5a19083f0
+    added_at: "2026-11-26T02:16:29Z"
+  - id: "composite.feedback.loading-skeleton"
+    version: "0.1.0"
+    target: vanilla
+    digest: e1e2cede156d6e24f5ba451b9148f6d1e8fd8ab640c7b40b67cbf1c58f79cb35
+    added_at: "2026-11-26T02:16:39Z"
+  - id: "composite.navigation.tabs"
+    version: "0.1.1"
+    target: vanilla
+    digest: f4f50fc1af9316fa5510432935e5e32f61f2f95d768432b5e247d32d78d7e69f
+    added_at: "2026-11-26T02:16:33Z"
+  - id: "composite.navigation.tree-explorer"
+    version: "0.1.0"
+    target: vanilla
+    digest: c1c44dd57f94a3e38d85149b809a4f59ca7b652e605b509e75e2bae36881a96c
+    added_at: "2026-11-26T02:16:34Z"
+  - id: "pattern.scale.ui-zoom"
+    version: "2.0.1"
+    target: vanilla
+    digest: b3632d4e349f386f99320fcf7e5e35a1dba90ba0e7824cad6a4f8d197bc0873c
+    added_at: "2026-11-26T02:16:38Z"
+  - id: "primitive.display.badge"
+    version: "0.1.0"
+    target: vanilla
+    digest: da3ec29e8fe0405d9f04188d0b1460730c5d8de1bdc0ce09b59377ff61a83c86
+    added_at: "2026-11-26T02:16:32Z"
+  - id: "primitive.input.select"
+    version: "0.1.1"
+    target: vanilla
+    digest: c4bbcd4a7b8b1c1929207c18af52c87f31621c3921a6b276f5a41abb29767c04
+    added_at: "2026-11-26T02:16:35Z"

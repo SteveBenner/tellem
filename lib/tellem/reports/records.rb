@@ -62,13 +62,20 @@ module Tellem
 
       def load(scope)
         root = scope["root"]
+        data = assemble(scope, derived_files(root).map { |_key, path| path })
+        data.session_keys = Record::Scope.session_keys(root)
+        data
+      end
+
+      def assemble(scope, paths, session_keys: [], accept: nil)
         seen = {}
         list = []
         superseded = {}
         torn = 0
-        derived_files(root).each do |_key, path|
+        paths.each do |path|
           torn += each_line_record(path) do |record|
             next unless Record::Formats.derived_valid?(record)
+            next if accept && !accept.call(record)
 
             superseded[record["supersedes"]] = true if record["supersedes"]
             position = seen[record["id"]]
@@ -87,7 +94,7 @@ module Tellem
 
           places[record.dig("body", "place_id")] ||= record["body"]
         end
-        Data.new(scope: scope, records: records, places: places, session_keys: Record::Scope.session_keys(root), torn: torn)
+        Data.new(scope: scope, records: records, places: places, session_keys: session_keys, torn: torn)
       end
 
       def earlier?(record, current)

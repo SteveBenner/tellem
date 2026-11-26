@@ -1,0 +1,7 @@
+.rui-tree-explorer { min-inline-size: 0; color: var(--text); overflow: auto; }
+.rui-tree-explorer [role="group"] { margin-inline-start: 1em; border-inline-start: 1px solid var(--border); }
+.rui-tree-explorer__row { display: flex; align-items: center; min-height: var(--control-h, 2.25rem); padding-inline: var(--space-2); overflow-wrap: anywhere; cursor: pointer; }
+.rui-tree-explorer__marker { flex: 0 0 1.5em; text-align: center; }
+.rui-tree-explorer [aria-selected="true"] > .rui-tree-explorer__row { color: var(--accent); font-weight: 650; }
+.rui-tree-explorer [role="treeitem"]:focus-visible { outline: none; }
+.rui-tree-explorer [role="treeitem"]:focus-visible > .rui-tree-explorer__row { outline: 2px solid var(--accent); outline-offset: -2px; }

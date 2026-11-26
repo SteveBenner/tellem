@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-11-25
+
+### Added
+
+- `tellem dashboard [--share] [--no-open] [--json]` writes one self-contained
+  HTML file over every registered repository and the last 30 days: the session
+  list, each session's agent tree, timeline, and tool calls, provider-reported
+  tokens with cost only where recorded, and capture health, in five themes (app
+  D-42). It runs no derive pass, queries no mirror, writes nothing into a
+  repository, and the page makes no network request. `--share` writes a second
+  copy without prompt text or paths, with repositories numbered; it still names
+  models, tools, agent types, and personas.
+- The `tellem.dashboard/v1` format in `specs/tellem.yml`, and a README section
+  and skill entry for the command.
+
+### Changed
+
+- `Reports::Records.load` builds each file's records through a shared
+  `Records.assemble`, which the dashboard also uses. Its result is unchanged.
+
 ## [0.5.15] - 2026-11-23
 
 ### Added

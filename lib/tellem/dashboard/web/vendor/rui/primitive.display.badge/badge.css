@@ -1,0 +1,41 @@
+.rui-badge {
+  position: relative;
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875em;
+  line-height: 1.25;
+}
+
+.rui-badge--ok {
+  border-color: var(--ok);
+}
+
+.rui-badge--warn {
+  border-color: var(--warn);
+}
+
+.rui-badge--danger {
+  border-color: var(--danger);
+}
+
+.rui-badge--accent {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rui-badge__tone {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

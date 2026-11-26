@@ -1,0 +1,229 @@
+.rui-time-series {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 100%;
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text);
+}
+
+.rui-time-series__plot {
+  position: relative;
+  flex: 1 1 5rem;
+  min-height: 5rem;
+  padding-top: 24px;
+}
+
+.rui-time-series__plot--labeled {
+  padding-right: 5.5rem;
+}
+
+.rui-time-series__svg {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  left: 2.25rem;
+  right: 0;
+  width: calc(100% - 2.25rem);
+  height: calc(100% - 24px);
+  display: block;
+  overflow: visible;
+}
+
+.rui-time-series__plot--labeled .rui-time-series__svg {
+  width: calc(100% - 7.75rem);
+}
+
+.rui-time-series__overlay {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.rui-time-series__unit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rui-time-series__grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  fill: none;
+}
+
+.rui-time-series__col {
+  fill: var(--accent);
+}
+
+.rui-time-series__col--progress {
+  fill-opacity: 0.45;
+}
+
+.rui-time-series__line {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.rui-time-series__line--focus {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.rui-time-series__line--progress {
+  stroke-dasharray: 3 3;
+}
+
+.rui-time-series__ref {
+  stroke: var(--text);
+  stroke-width: 1;
+  fill: none;
+}
+
+.rui-time-series__tick,
+.rui-time-series__ref-label,
+.rui-time-series__direct {
+  position: absolute;
+  top: var(--rui-time-series-y, 0);
+  font-size: 11px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rui-time-series__tick {
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.rui-time-series__ref-label {
+  left: 2.75rem;
+  transform: translateY(-110%);
+}
+
+.rui-time-series__ref-label--below {
+  transform: translateY(10%);
+}
+
+.rui-time-series__direct {
+  right: 0;
+  transform: translateY(-50%);
+  font-weight: 600;
+}
+
+.rui-time-series__labels {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 2.25rem;
+  gap: var(--space-2);
+  font-size: 11px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.rui-time-series__plot--labeled ~ .rui-time-series__labels {
+  padding-right: 5.5rem;
+}
+
+.rui-time-series__caption {
+  margin: 0;
+  font-size: 12px;
+}
+
+.rui-time-series__icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+}
+
+.rui-time-series__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .rui-time-series__toggle {
+    min-height: var(--control-h, 2.75rem);
+  }
+}
+
+.rui-time-series__toggle:hover {
+  border-color: var(--accent);
+}
+
+.rui-time-series__toggle:focus-visible {
+  outline: 2px solid var(--accent-2, var(--accent));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rui-time-series__toggle:active {
+    transform: translateY(1px);
+  }
+}
+
+.rui-time-series__table-wrap {
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.rui-time-series__table-wrap[hidden],
+.rui-time-series__table[hidden] {
+  display: none;
+}
+
+.rui-time-series__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rui-time-series__table th,
+.rui-time-series__table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.rui-time-series__table th:first-child,
+.rui-time-series__table td:first-child {
+  text-align: left;
+}
+
+.rui-time-series__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.rui-time-series__empty {
+  margin: 0;
+  font-size: 0.875em;
+}

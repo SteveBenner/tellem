@@ -1,0 +1,18 @@
+.rui-stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3) var(--space-5);
+  align-items: start;
+  min-width: 0;
+  color: var(--text);
+}
+
+.rui-stat-row__cell {
+  min-width: 0;
+}
+
+.rui-stat-row__empty {
+  margin: 0;
+  font-size: 0.875em;
+  color: var(--text);
+}

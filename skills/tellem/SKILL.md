@@ -31,6 +31,7 @@ next command.
 | Timed spans of requests, tool calls, subagents, and task turns | `tellem spans [--session S] [--task T] [--agent A [--descendants]] [--kind request,tool_call,subagent,turn] [--since T] [--until T] [--limit N]` |
 | Time and tokens per task | `tellem tasks`, `tellem tokens --tasks` (needs `tasks.mode` on, the default) |
 | Capture health, gaps, and lag | `tellem health [--scope PATH]` |
+| One page over every repository: sessions, agent timelines, spend, and health | `tellem dashboard [--share] [--no-open] [--json]` |
 | Whether tellem itself is working | `tellem doctor` |
 | Settings and where each value comes from | `tellem config list [--scope PATH]` |
 | Shadow progress and parity with SpecStory and the ledger | `tellem shadow status`, `tellem parity` |
@@ -60,6 +61,13 @@ combines with `--all`, `--scope`, `--repo`, and `--no-derive`. Use
 
 Tokens are only what the provider reported. Never estimate or add tokens
 tellem did not report.
+
+`tellem dashboard` writes one private HTML file in tellem's state directory
+over every registered scope, the last 30 days, and opens it when run in a
+terminal. It takes no `--scope` and never derives, so it shows the record as of
+its printed time. `--share` writes a copy without prompt text or paths, which
+still names models, tools, agent types, and personas; ask before sending any
+dashboard file anywhere. `--json` prints the data and writes nothing.
 
 `tellem spans --json` returns one row per timed span in `data.rows`, with
 `data.truncated` and `data.total`. It carries metadata only, never prompt,

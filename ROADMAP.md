@@ -20,11 +20,12 @@ excluded root still gets a `.tellem` scope. A visibility check of the origin
 URL at scope location would treat it as excluded, and doctor would report an
 excluded scope whose directory is gone as retired rather than dangling.
 
-## Dashboard
+## Dashboard server and later views
 
-A read-only view over the same reports the CLI prints: the agent tree, places,
-tokens by any dimension, state over time, and capture health. It reads files
-or a mirror through the existing report code and adds no record.
+`tellem dashboard` writes one file (D-42). Left for later: a local server that
+reads on demand, which needs a second loopback listener in the specification,
+and views of tasks, places, messages, and transcripts. Reading a database mirror
+is left out as well.
 
 ## Other harnesses
 

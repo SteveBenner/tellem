@@ -1,0 +1,287 @@
+.rui-table {
+  --rui-table-row: 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.rui-table[data-density="compact"] {
+  --rui-table-row: 24px;
+}
+
+.rui-table[data-density="cockpit"] {
+  --rui-table-row: 28px;
+}
+
+.rui-table[data-density="application"] {
+  --rui-table-row: 36px;
+}
+
+.rui-table[data-density="reading"] {
+  --rui-table-row: 44px;
+}
+
+.rui-table__toolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-height: 32px;
+  margin-block-end: var(--space-1);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.rui-table__status {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.rui-table__spacer {
+  flex: 1 1 auto;
+}
+
+.rui-table__region {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  max-height: var(--rui-table-max-height, none);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.rui-table__region:focus-visible {
+  outline: 2px solid var(--accent-2, var(--accent));
+  outline-offset: 2px;
+}
+
+.rui-table__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.rui-table__caption {
+  padding: var(--space-2);
+  text-align: start;
+  color: var(--text-dim);
+}
+
+.rui-table__cell {
+  box-sizing: border-box;
+  height: var(--rui-table-row);
+  padding: 0 var(--space-2);
+  border-block-end: 1px solid var(--border);
+  background: var(--surface);
+  text-align: start;
+  font-weight: 400;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.rui-table__table thead .rui-table__cell {
+  background: var(--surface-2, var(--surface));
+  font-weight: 500;
+}
+
+.rui-table[data-sticky="true"] thead .rui-table__cell {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.rui-table__table tbody tr:last-child .rui-table__cell {
+  border-block-end: 0;
+}
+
+.rui-table__cell--end {
+  text-align: end;
+}
+
+.rui-table__cell--figures {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.rui-table__cell--dim {
+  color: var(--text-dim);
+}
+
+.rui-table__cell--select {
+  width: 1%;
+  padding-inline: var(--space-1);
+}
+
+.rui-table__row:hover .rui-table__cell {
+  background: var(--surface-2, var(--surface));
+}
+
+.rui-table__row[data-selected="true"] .rui-table__cell {
+  background: var(--accent-soft);
+}
+
+.rui-table__empty {
+  color: var(--text-dim);
+  white-space: normal;
+}
+
+.rui-table__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.rui-table__input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.rui-table__input:focus-visible {
+  outline: 2px solid var(--accent-2, var(--accent));
+  outline-offset: 2px;
+}
+
+.rui-table__sort {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.rui-table__cell--end .rui-table__sort {
+  flex-direction: row-reverse;
+}
+
+.rui-table__sort:focus-visible,
+.rui-table__button:focus-visible,
+.rui-table__open:focus-visible {
+  outline: 2px solid var(--accent-2, var(--accent));
+  outline-offset: 2px;
+}
+
+.rui-table__sort-mark {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+}
+
+.rui-table__icon {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.rui-table__open,
+.rui-table__button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.rui-table__open:hover,
+.rui-table__button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.rui-table__button:disabled {
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.rui-table__columns {
+  position: relative;
+}
+
+.rui-table__panel {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 200px;
+  margin-block-start: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.rui-table__panel[hidden] {
+  display: none;
+}
+
+.rui-table__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.rui-table__option-reason {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.rui-table__cell > .rui-table__sr {
+  position: static;
+  display: inline-block;
+  width: 0;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  vertical-align: baseline;
+}
+
+.rui-table__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rui-table__cell {
+    transition: background-color var(--dur-fast) var(--ease);
+  }
+}

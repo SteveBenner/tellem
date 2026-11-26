@@ -6,7 +6,7 @@
 
 > **AI agents:** to install tellem, follow [`INSTALL.md`](INSTALL.md). To work on it, read [`AGENTS.md`](AGENTS.md) first.
 
-**A flight recorder for your coding agents.** tellem quietly records what every Claude Code and Codex session does: which agents and subagents ran, who spawned whom, where each one worked, what they said to each other, how long it took, and what the provider reported they spent. It keeps all of it in plain files on your own computer. When you want to know something, you don't learn a dashboard. You ask your agent.
+**A flight recorder for your coding agents.** tellem quietly records what every Claude Code and Codex session does: which agents and subagents ran, who spawned whom, where each one worked, what they said to each other, how long it took, and what the provider reported they spent. It keeps all of it in plain files on your own computer. When you want to know something, you ask your agent. When you would rather look than ask, [`tellem dashboard`](#the-dashboard) puts it on one page.
 
 ## Contents
 
@@ -19,6 +19,7 @@
 - [In plain words](#in-plain-words)
 - [What you can ask](#what-you-can-ask)
 - [Install with one sentence](#install-with-one-sentence)
+- [The dashboard](#the-dashboard)
 - [How it works](#how-it-works)
 - [Honest limits and status](#honest-limits-and-status)
 - [Command reference](#command-reference)
@@ -340,6 +341,21 @@ cd ~ && ~/.rplugin/bin/rplugin install tellem
 
 Turn recording off at any time with `TELLEM_DISABLED=1`, or `tellem config set features.capture false`.
 
+## The dashboard
+
+```sh
+tellem dashboard            # write the page and open it
+tellem dashboard --share    # a copy without prompt text or paths
+```
+
+One self-contained HTML file over every repository tellem has recorded, with the last 30 days inside and the last 24 hours shown first:
+
+- **Sessions.** Every session with its repository, opening line, agents, active time, tokens, and failed tool calls. Open one for its agent tree, a timeline of when each agent worked, and its tool calls.
+- **Spend.** Provider-reported tokens over time and by model, agent type, repository, persona, and effort. Cost shows only where OpenTelemetry recorded it.
+- **Health.** Capture gaps, hook latency, and how far behind each repository's record is.
+
+It only reads. It runs no catch-up pass, writes nothing into a repository, and the page makes no network request, so it shows the record as of the time printed on it. The file lives in tellem's state folder, readable only by you. The `--share` copy drops prompt text and paths and numbers your repositories, but it still names the models, tools (including MCP server tool names), agent types, and personas you used, so read it before you send it. `--no-open` only writes the file, and `--json` prints the same data without writing anything.
+
 ## How it works
 
 <p align="center">
@@ -368,7 +384,7 @@ The engineering view (components, sequence diagrams of the capture, derive, and 
 
 ## Honest limits and status
 
-- **It records one machine.** There is no hosted service or shared dashboard. A team view means each person runs tellem, or a shared PostgreSQL mirror.
+- **It records one machine.** There is no hosted service, and the dashboard is a file on your computer. A team view means each person runs tellem, or a shared PostgreSQL mirror.
 - **Tokens are what the provider reported.** tellem never estimates. A request the provider reported nothing for shows as a gap, not a guess.
 - **Recording starts with the next session** after install. Earlier sessions can be imported from the agent app's own transcripts with `tellem import`.
 - **Codex needs one extra step.** Codex asks you to trust a plugin's hooks before they run, and until you do, Codex sessions aren't recorded. Codex can't go past `spool` on the takeover ladder.
@@ -392,12 +408,13 @@ tellem spans --session S --json  # timed requests, tool calls, subagents, and ta
 tellem tasks                     # prompts grouped into tasks, with time beside tokens
 tellem state main                # lifecycle, context, workspace, and time
 tellem health                    # hook latency, gaps, derive lag
+tellem dashboard                 # one page over every repository, read only
 tellem doctor                    # what is wrong and the next command
 ```
 
 - **Scope.** Commands answer for the repository you're in. Add `--scope PATH` for another one, or `--all` for every repository tellem has seen.
 - **Output.** Every command takes `--json`.
-- **Speed.** Every read command takes `--no-derive`, which skips the catch-up pass and answers from the record already derived.
+- **Speed.** Every read command but `dashboard`, which never derives, takes `--no-derive`, which skips the catch-up pass and answers from the record already derived.
 - **Tasks.** With `tasks.mode` on (the default), tellem groups your prompts into tasks with the `tasks.*` settings. It is telemetry only: no hook, marker reply, or status line.
 - **Settings.** `tellem config list` shows every setting and where its value comes from. `tellem config set KEY VALUE [--scope PATH]` changes one.
 

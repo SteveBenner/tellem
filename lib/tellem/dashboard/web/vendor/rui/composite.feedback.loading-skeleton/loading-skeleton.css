@@ -1,0 +1,7 @@
+.rui-loading-skeleton { min-inline-size: 0; }
+.rui-loading-skeleton__shapes { display: grid; gap: var(--space-2); }
+.rui-loading-skeleton__shapes > span { display: block; block-size: .875em; inline-size: 90%; background: var(--border); border-radius: var(--radius); }
+.rui-loading-skeleton__shapes > span:nth-child(3n + 2) { inline-size: 72%; }
+.rui-loading-skeleton__shapes > span:nth-child(3n) { inline-size: 80%; }
+.rui-loading-skeleton[data-variant="rows"] .rui-loading-skeleton__shapes > span { block-size: var(--control-h, 2.25rem); inline-size: 100%; }
+.rui-loading-skeleton__status { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
