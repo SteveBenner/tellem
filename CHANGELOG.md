@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-11-26
+
+### Fixed
+
+- A record file or folder tellem may not read no longer ends `health`, `sessions`, `tree`, `tokens`, `spans`, `tasks`, `messages`, `parity`, `where`, `state`, or `views rebuild` with a Ruby stack trace. `tellem health` finishes and lists each one under `unreadable`; the other commands stop with `permission denied: PATH` and the `chmod` that restores access (exit 1).
+- Those commands no longer report an unreadable `sessions` folder as holding nothing, and a view rebuild no longer empties `TOKENS.jsonl` because of one.
+- `tellem dashboard` marks a repository whose `.tellem` folder it cannot read as unreadable and continues, instead of crashing.
+
 ## [0.5.16] - 2026-11-25
 
 ### Added

@@ -1,6 +1,6 @@
 schema: tellem.application/v1
 name: tellem
-version: 0.10.0
+version: 0.10.1
 kind: rplugin
 status: conceptual
 recorded: '2026-10-21'
@@ -243,7 +243,8 @@ journeys:
       lived, stood, worked, and reached, which sessions worked in a repository,
       the tokens by any dimension, state over time, and capture health. Queries
       read the files, or the backend when one is configured and current. Every
-      report has a JSON form.
+      report has a JSON form. A report that meets a file or folder of the record
+      that it may not read stops and names it (D-43).
   - id: J-5
     name: Configure and provision
     flow: >-
@@ -1202,6 +1203,23 @@ decisions:
       can lag the record, and it states its as-of time and each scope's derivation lag.
     alternatives: [a local server first, run the deriver before each file, embed every tool call, read a database mirror, keep one file per run]
     revisit_when: A dashboard server is built, which amends the single listener rule of the exclusions and D-16, or the file exceeds the bounds of Q-12.
+
+  - id: D-43
+    decision: >-
+      A report that meets a file or folder it may not read stops with one message
+      naming it and the command that restores access, and never counts it as empty.
+      Transcript search, transcript show, and shadow status are unchanged and still
+      skip what they cannot read. Capture health instead finishes, lists every record file and folder it could not
+      read, and computes its figures from the rest; for a scope whose .tellem directory
+      cannot be read it states no figure. The dashboard keeps marking such a repository
+      unreadable and continuing.
+    rationale: >-
+      The maintainer chose this on 2026-11-26. Until then one unreadable file ended
+      eleven report commands with a Ruby stack trace, and an unreadable sessions folder
+      was reported as holding nothing. Totals from the other reports are never partial,
+      and health is the command that says what is wrong.
+    alternatives: [every report skips unreadable files and names them, change capture health alone]
+    revisit_when: A report must finish across many scopes while one stays unreadable.
 
 metrics:
   status: Confirmed by the maintainer, 2026-10-21.

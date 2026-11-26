@@ -82,7 +82,7 @@ module Tellem
       end
 
       def wanted_sessions(live, params)
-        keys = live.flat_map { |scope| Record::Scope.session_keys(scope["root"]) }.uniq
+        keys = live.flat_map { |scope| Record::Scope.session_keys!(scope["root"]) }.uniq
         spec = params["session"] || (params["agent"] && params["agent"].include?("/") ? params["agent"].split("/", 2).first : nil)
         return keys if spec.nil?
 

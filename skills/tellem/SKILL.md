@@ -30,7 +30,7 @@ next command.
 | One agent's transcript | `tellem transcript show AGENT` |
 | Timed spans of requests, tool calls, subagents, and task turns | `tellem spans [--session S] [--task T] [--agent A [--descendants]] [--kind request,tool_call,subagent,turn] [--since T] [--until T] [--limit N]` |
 | Time and tokens per task | `tellem tasks`, `tellem tokens --tasks` (needs `tasks.mode` on, the default) |
-| Capture health, gaps, and lag | `tellem health [--scope PATH]` |
+| Capture health, gaps, lag, and unreadable record files | `tellem health [--scope PATH]` |
 | One page over every repository: sessions, agent timelines, spend, and health | `tellem dashboard [--share] [--no-open] [--json]` |
 | Whether tellem itself is working | `tellem doctor` |
 | Settings and where each value comes from | `tellem config list [--scope PATH]` |

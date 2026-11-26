@@ -197,8 +197,14 @@ module Tellem
       def mirror_file(root) = File.join(dir(root), "mirror.sqlite3")
 
       def session_keys(root)
-        Dir.children(sessions_dir(root)).select { |key| Ids.valid_session_key?(key) }.sort
+        session_keys!(root)
       rescue SystemCallError
+        []
+      end
+
+      def session_keys!(root)
+        Dir.children(sessions_dir(root)).select { |key| Ids.valid_session_key?(key) }.sort
+      rescue Errno::ENOENT, Errno::ENOTDIR
         []
       end
     end

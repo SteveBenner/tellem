@@ -116,7 +116,7 @@ module Tellem
       def sources(scope)
         chosen = {}
         conflicts = []
-        Record::Scope.session_keys(scope).each do |session_key|
+        Record::Scope.session_keys!(scope).each do |session_key|
           transcripts(scope, session_key).each do |name, path|
             if chosen.key?(name)
               conflicts << { "name" => name, "session_key" => session_key }
@@ -139,7 +139,7 @@ module Tellem
           path = File.join(dir, name)
           Record::FS.lstat(path)&.file? ? [name, path] : nil
         end
-      rescue SystemCallError
+      rescue Errno::ENOENT, Errno::ENOTDIR
         []
       end
 

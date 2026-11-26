@@ -1,7 +1,7 @@
 schema: tellem.formats-spec/v1
 title: tellem record and output formats
 status: normative
-applies_to: tellem 0.5.16
+applies_to: tellem 0.5.17
 authority:
 - >-
   This file is the normative definition of every file tellem writes and every machine-readable output
@@ -6016,6 +6016,20 @@ planes:
         duration_ms, phase_ms (phases config raw places workspace transcripts alignment remote persona
         lifecycle tasks pointers registry projections mirror events, milliseconds each).
       - Error object keys with a nil value are omitted.
+      - >-
+        A command refused access to a file or directory (EACCES or EPERM) is a failure with code
+        operational_failure (exit 1): message 'permission denied: PATH', next_command 'chmod u+rwX PATH' with
+        PATH shell-escaped, and detail {path}. PATH is the first directory on the way that cannot be searched,
+        else the file or directory that was refused. When the system message carries no path, the message is
+        'permission denied', next_command 'tellem health --all', and detail {message}. An unreadable sessions
+        directory is such a failure for every report that reads derived records and for a view rebuild, never
+        an empty result. tellem search, transcript, and shadow still skip what they cannot read.
+      - >-
+        tellem health does not fail that way for the record or the hook gap file. Each scope's health carries
+        unreadable (sorted paths, empty when everything was read), and its other figures are computed from what
+        was read; when the scope's .tellem directory cannot be read, every other figure of that scope is null.
+        hook_gaps carries unreadable the same way, and its total and torn_lines are null when the file cannot be
+        read. The text form adds an unreadable line per path.
     - id: mirror schema
       name: SQLite and PostgreSQL mirror tables
       file: >-

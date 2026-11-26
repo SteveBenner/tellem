@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require_relative "../denied"
 require_relative "../ports/harness_paths"
 require_relative "../record/fs"
 require_relative "../record/scope"
@@ -12,6 +13,7 @@ module Tellem
   module Reports
     module Health
       SLO_P99_MS = 50
+      FIGURES = %w[raw_observations derived_observations torn_lines hook_ms gaps derive mirror].freeze
 
       module_function
 
@@ -24,20 +26,28 @@ module Tellem
 
       def scope_health(scope, now)
         root = scope["root"]
+        closed = closed_directory(Record::Scope.dir(root))
+        return FIGURES.to_h { |name| [name, nil] }.merge("unreadable" => [closed]) if closed
+
+        unreadable = []
         samples = Hash.new { |hash, key| hash[key] = [] }
         newest = nil
         raw_torn = 0
         raw_count = 0
-        Record::Scope.session_keys(root).each do |key|
-          raw_files(root, key).each do |path|
-            raw_torn += Records.each_line_record(path) do |record|
-              raw_count += 1
-              newest = record["ts"] if record["ts"].is_a?(String) && (newest.nil? || record["ts"] > newest)
-              samples[[record["harness"].to_s, record["event"].to_s]] << record["hook_ms"] if record["hook_ms"].is_a?(Integer)
+        keys = reading(unreadable, Record::Scope.sessions_dir(root)) { Record::Scope.session_keys!(root) }.to_a
+        keys.each do |key|
+          raw_files(root, key, unreadable).each do |path|
+            torn = reading(unreadable, path) do
+              Records.each_line_record(path) do |record|
+                raw_count += 1
+                newest = record["ts"] if record["ts"].is_a?(String) && (newest.nil? || record["ts"] > newest)
+                samples[[record["harness"].to_s, record["event"].to_s]] << record["hook_ms"] if record["hook_ms"].is_a?(Integer)
+              end
             end
+            raw_torn += torn.to_i
           end
         end
-        data = Records.load(scope)
+        data = Records.assemble(scope, derived_paths(root, keys, unreadable))
         {
           "raw_observations" => raw_count,
           "derived_observations" => data.records.size,
@@ -45,20 +55,44 @@ module Tellem
           "hook_ms" => hook_ms(samples),
           "gaps" => gaps(data),
           "derive" => derive_lag(root, newest),
-          "mirror" => mirror(scope)
+          "mirror" => mirror(scope),
+          "unreadable" => unreadable.uniq.sort
         }
       end
 
-      def raw_files(root, key)
-        dir = Record::Scope.raw_dir(root, key)
-        stat = Record::FS.lstat(dir)
-        return [] unless stat&.directory?
+      def closed_directory(dir)
+        blocked = Denied.first_blocked(dir)
+        return blocked if blocked != dir
 
-        Dir.children(dir).sort.filter_map do |name|
-          path = File.join(dir, name)
-          name.end_with?(".jsonl") && Record::FS.lstat(path)&.file? ? path : nil
+        File.directory?(dir) && !(File.readable?(dir) && File.executable?(dir)) ? dir : nil
+      end
+
+      def reading(unreadable, path)
+        yield
+      rescue Errno::EACCES, Errno::EPERM
+        unreadable << Denied.first_blocked(path)
+        nil
+      end
+
+      def derived_paths(root, keys, unreadable)
+        keys.filter_map do |key|
+          path = Record::Scope.derived_path(root, key)
+          reading(unreadable, path) { Record::FS.open_read(path) { path } if Record::FS.lstat(path)&.file? }
         end
-      rescue SystemCallError
+      end
+
+      def raw_files(root, key, unreadable)
+        dir = Record::Scope.raw_dir(root, key)
+        found = reading(unreadable, dir) do
+          next [] unless Record::FS.lstat(dir)&.directory?
+
+          Dir.children(dir).sort.filter_map do |name|
+            path = File.join(dir, name)
+            name.end_with?(".jsonl") && Record::FS.lstat(path)&.file? ? path : nil
+          end
+        end
+        found.to_a
+      rescue Errno::ENOENT, Errno::ENOTDIR
         []
       end
 
@@ -119,9 +153,10 @@ module Tellem
       def hook_gaps
         path = Ports::HarnessPaths.hook_gaps
         totals = Hash.new(0)
-        torn = Records.each_line_record(path) { |record| totals[record["cause"].to_s] += 1 }
-        { "path" => path, "total" => totals.values.sum, "torn_lines" => torn,
-          "by_cause" => totals.keys.sort.map { |cause| { "cause" => cause, "count" => totals[cause] } } }
+        unreadable = []
+        torn = reading(unreadable, path) { Records.each_line_record(path) { |record| totals[record["cause"].to_s] += 1 } }
+        { "path" => path, "total" => unreadable.empty? ? totals.values.sum : nil, "torn_lines" => torn,
+          "by_cause" => totals.keys.sort.map { |cause| { "cause" => cause, "count" => totals[cause] } }, "unreadable" => unreadable }
       end
 
       def hook_gap_hours(since:, before:)
@@ -150,19 +185,29 @@ module Tellem
           next ["#{scope['root']}: gone"] unless scope["health"]
 
           health = scope["health"]
+          title = "#{scope['root']} (#{scope['scope_id']})"
+          unread = health["unreadable"].map { |path| "  unreadable: #{path}" }
+          next [title, *unread] if health["raw_observations"].nil?
+
           overall = health["hook_ms"]["overall"]
           derive = health["derive"]
           mirror = health["mirror"]
-          ["#{scope['root']} (#{scope['scope_id']})",
+          [title,
            "  hook_ms: #{overall['count']} samples, p50 #{Text.cell(overall['p50'])}, p99 #{Text.cell(overall['p99'])}, max #{Text.cell(overall['max'])} (slo p99 < #{SLO_P99_MS})",
            *health["hook_ms"]["groups"].map { |group| "    #{group['harness']} #{group['event']}: #{group['count']} samples, p99 #{group['p99']}" },
            "  observations: #{health['raw_observations']} raw, #{health['derived_observations']} derived; torn lines #{health['torn_lines']['raw']} raw, #{health['torn_lines']['derived']} derived",
            "  gaps: #{health['gaps']['total']}#{health['gaps']['by_cause'].map { |row| " #{row['cause']}=#{row['count']}" }.join}",
            "  derive lag: #{derive['lag_seconds'].nil? ? 'never derived' : "#{derive['lag_seconds']} s"}#{derive['dirty'] ? ' (dirty)' : ''}",
-           "  mirror: #{mirror['kind']}#{mirror['kind'] == 'none' ? '' : " lag #{Text.cell(mirror['lag_seconds'])} s, reachable #{mirror['reachable'] ? 'yes' : 'no'}, breaker #{mirror['breaker']}"}"]
+           "  mirror: #{mirror['kind']}#{mirror['kind'] == 'none' ? '' : " lag #{Text.cell(mirror['lag_seconds'])} s, reachable #{mirror['reachable'] ? 'yes' : 'no'}, breaker #{mirror['breaker']}"}",
+           *unread]
         end
-        gaps = report["hook_gaps"]
-        (lines + ["hook gaps: #{gaps['total']}#{gaps['by_cause'].map { |row| " #{row['cause']}=#{row['count']}" }.join}"]).join("\n")
+        (lines + [hook_gap_line(report["hook_gaps"])]).join("\n")
+      end
+
+      def hook_gap_line(gaps)
+        return "hook gaps: unreadable: #{gaps['unreadable'].join(' ')}" unless gaps["unreadable"].empty?
+
+        "hook gaps: #{gaps['total']}#{gaps['by_cause'].map { |row| " #{row['cause']}=#{row['count']}" }.join}"
       end
     end
   end

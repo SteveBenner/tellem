@@ -3,6 +3,7 @@
 require "etc"
 require "json"
 require_relative "../backends/rows"
+require_relative "../denied"
 require_relative "../errors"
 require_relative "../otel/report_details"
 require_relative "../record/formats"
@@ -14,6 +15,7 @@ module Tellem
   module Reports
     module Scan
       MAX_WORKERS = 8
+      DENIED_STATUS = 3
       INLINE_BYTES = 4 * 1024 * 1024
       NULL_SUPERSEDES = '"supersedes":null'
       TOP = %w[id ts session_key agent_key].freeze
@@ -112,6 +114,9 @@ module Tellem
           status = 0
           begin
             writer.write(JSON.generate(inline(share, columns)))
+          rescue Errno::EACCES, Errno::EPERM => e
+            writer.write(e.message)
+            status = DENIED_STATUS
           rescue StandardError
             status = 1
           ensure
@@ -127,6 +132,8 @@ module Tellem
         bytes = reader.read
         reader.close
         _, status = Process.wait2(pid)
+        raise Denied.failure(bytes.force_encoding(Encoding::UTF_8)) if status.exitstatus == DENIED_STATUS
+
         unless status.success? && !bytes.empty?
           raise OperationalFailure.new("a report worker failed (#{status.exitstatus.inspect})", next_command: "tellem health")
         end

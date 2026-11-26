@@ -69,4 +69,8 @@ module Tellem
   class SymlinkRefused < Error
     CODE = "operational_failure"
   end
+
+  class PermissionDenied < Error
+    CODE = "operational_failure"
+  end
 end

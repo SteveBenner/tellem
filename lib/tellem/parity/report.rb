@@ -35,14 +35,14 @@ module Tellem
     end
 
     def scope_sessions(root, filter, since, retired = {})
-      keys = Record::Scope.session_keys(root).select { |key| wanted?(key, filter) }
+      keys = Record::Scope.session_keys!(root).select { |key| wanted?(key, filter) }
       return [] if keys.empty?
 
       history = History.new(root)
       ledger, ledger_problem, duplicates = Record::Scope.kind(root) == "repository" ? Ledger.read(root) : [{}, nil, {}]
       view = Projections::Tokens.rows(root).group_by { |row| row["session_id"] }
       ledger, duplicates = Ledger.routed(root, view.values.flatten(1), ledger, duplicates) if Record::Scope.kind(root) == "repository"
-      known = Record::Scope.session_keys(root).map { |key| key.split("-", 2).last } | ledger.keys
+      known = Record::Scope.session_keys!(root).map { |key| key.split("-", 2).last } | ledger.keys
       keys.filter_map do |key|
         last_at = last_at(root, key)
         next if since && last_at.to_s < since

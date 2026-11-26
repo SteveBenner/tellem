@@ -44,6 +44,8 @@ module Tellem
         dir = Record::Scope.dir(root)
         stat = Record::FS.lstat(dir)
         stat&.directory? && Record::FS.lstat(File.join(dir, "scope.json"))&.file? ? true : false
+      rescue Errno::EACCES, Errno::EPERM
+        true
       end
 
       def descriptor_id(root)

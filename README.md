@@ -407,7 +407,7 @@ tellem tokens --by agent,model   # provider-reported tokens; also session, subag
 tellem spans --session S --json  # timed requests, tool calls, subagents, and task turns
 tellem tasks                     # prompts grouped into tasks, with time beside tokens
 tellem state main                # lifecycle, context, workspace, and time
-tellem health                    # hook latency, gaps, derive lag
+tellem health                    # hook latency, gaps, derive lag, unreadable files
 tellem dashboard                 # one page over every repository, read only
 tellem doctor                    # what is wrong and the next command
 ```

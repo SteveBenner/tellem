@@ -54,7 +54,7 @@ module Tellem
       end
 
       def derived_files(root)
-        Record::Scope.session_keys(root).filter_map do |key|
+        Record::Scope.session_keys!(root).filter_map do |key|
           path = Record::Scope.derived_path(root, key)
           Record::FS.lstat(path)&.file? ? [key, path] : nil
         end
@@ -63,7 +63,7 @@ module Tellem
       def load(scope)
         root = scope["root"]
         data = assemble(scope, derived_files(root).map { |_key, path| path })
-        data.session_keys = Record::Scope.session_keys(root)
+        data.session_keys = Record::Scope.session_keys!(root)
         data
       end
 

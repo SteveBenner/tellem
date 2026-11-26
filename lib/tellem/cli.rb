@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "denied"
 require_relative "errors"
 require_relative "record/schemas"
 
@@ -44,6 +45,8 @@ module Tellem
       emit(context, handler.run(context))
     rescue Tellem::Error => e
       failure(context || Context.new(command: name, json: json, stdout: stdout, stderr: stderr), e)
+    rescue Errno::EACCES, Errno::EPERM => e
+      failure(context || Context.new(command: name, json: json, stdout: stdout, stderr: stderr), Denied.failure(e.message))
     end
 
     def load_command(name)

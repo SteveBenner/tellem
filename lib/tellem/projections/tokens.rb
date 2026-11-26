@@ -75,7 +75,7 @@ module Tellem
         places = {}
         stopped = {}
         lines = {}
-        Record::Scope.session_keys(scope).each do |session_key|
+        Record::Scope.session_keys!(scope).each do |session_key|
           Record::Reader.each(Record::Scope.derived_path(scope, session_key)) do |record|
             next unless record["schema"] == Record::Schemas::DERIVED && record["session_key"] == session_key
 
